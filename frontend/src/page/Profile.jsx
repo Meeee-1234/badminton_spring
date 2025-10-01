@@ -1,0 +1,186 @@
+import React from "react";
+
+export default function Profile() {
+  return (
+    <div style={{ minHeight: "100vh", background: "#f9fafb" }}>
+      {/* HERO */}
+        <section style={{ position: "relative" }}>
+            <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "40px 20px" }}>
+
+                <div  style={{ textAlign: "left" }}>
+                    <a href="/" style={{ display: "inline-flex", alignItems: "center", gap: "8px", borderRadius: "12px", border: "1px solid #6ee7b7", background: "#ecfdf5",
+                    padding: "8px 16px", color: "#065f46", fontWeight: "600", textDecoration: "none", marginBottom: "20px", marginLeft: "0", }} > 
+                    ← กลับหน้าแรก 
+                    </a>
+                </div>
+
+                <h1 style={{ fontSize: "2.2rem", fontWeight: "800", color: "#064e3b", textAlign: "center", }} > Your Profile </h1>
+                <p style={{ color: "#4b5563", marginTop: "10px", maxWidth: "700px", textAlign: "center", marginLeft: "auto", marginRight: "auto", }} >
+                    จัดการข้อมูลบัญชีของคุณ และอัปเดตเบอร์ติดต่อเพื่อการจองที่รวดเร็วขึ้น
+                </p>
+            </div>
+        </section>
+
+        <section style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 20px 60px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "24px", }} >
+
+            <aside>
+            <div style={{ borderRadius: "16px", border: "1px solid #e5e7eb", background: "white", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", padding: "24px", }} >
+              <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                
+                <div style={{ height: "56px", width: "56px", borderRadius: "50%", background: "#d1fae5", color: "#065f46", display: "flex", alignItems: "center",
+                              justifyContent: "center", fontWeight: "800",fontSize: "18px", }} > </div>
+                    <div>
+                  <div style={{ fontSize: "20px", fontWeight: "700", color: "#111827" }}> User Name </div>
+                  <div style={{ fontSize: "14px", color: "#6b7280" }}>user@example.com</div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: "24px", fontSize: "14px", borderTop: "1px solid #e5e7eb" }}>
+                <div
+                  style={{
+                    padding: "12px 0",
+                    display: "flex",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <span style={{ color: "#6b7280" }}>Phone</span>
+                  <span style={{ fontWeight: "500", color: "#111827" }}>081-234-5678</span>
+                </div>
+                <div
+                  style={{
+                    padding: "12px 0",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    borderTop: "1px solid #e5e7eb",
+                  }}
+                >
+                  <span style={{ color: "#6b7280" }}>Member since</span>
+                  <span style={{ fontWeight: "500", color: "#111827" }}>01/01/2024</span>
+                </div>
+              </div>
+
+              <div style={{ marginTop: "24px" }}>
+                <button
+                  style={{
+                    width: "100%",
+                    borderRadius: "12px",
+                    background: "#dc2626",
+                    color: "white",
+                    padding: "12px",
+                    fontWeight: "600",
+                    border: "none",
+                    cursor: "pointer",
+                    boxShadow: "0 4px 8px rgba(220,38,38,0.3)",
+                  }}
+                  onMouseOver={(e) => (e.target.style.background = "#b91c1c")}
+                  onMouseOut={(e) => (e.target.style.background = "#dc2626")}
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          </aside>
+
+          {/* RIGHT: EDIT FORM */}
+          <main>
+            <form
+              style={{
+                borderRadius: "16px",
+                border: "1px solid #e5e7eb",
+                background: "white",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                padding: "24px",
+              }}
+            >
+              <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#065f46", marginBottom: "16px" }}>
+                แก้ไขข้อมูล
+              </h2>
+
+              <div style={{ display: "grid", gap: "20px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "14px", marginBottom: "6px" }}>
+                    Username
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue="User Name"
+                    style={{
+                      width: "100%",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      padding: "12px",
+                      outline: "none",
+                      fontSize: "14px",
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "14px", marginBottom: "6px" }}>
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    defaultValue="user@example.com"
+                    readOnly
+                    style={{
+                      width: "100%",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      padding: "12px",
+                      background: "#f9fafb",
+                      color: "#6b7280",
+                      fontSize: "14px",
+                    }}
+                  />
+                  <p style={{ fontSize: "12px", color: "#9ca3af", marginTop: "4px" }}>
+                    * เปลี่ยนอีเมลควรทำผ่านการยืนยันตัวตน
+                  </p>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "14px", marginBottom: "6px" }}>
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    defaultValue="081-234-5678"
+                    style={{
+                      width: "100%",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      padding: "12px",
+                      outline: "none",
+                      fontSize: "14px",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "24px" }}>
+                <button
+                  type="submit"
+                  style={{
+                    borderRadius: "12px",
+                    background: "#059669",
+                    color: "white",
+                    padding: "12px 20px",
+                    fontWeight: "600",
+                    border: "none",
+                    cursor: "pointer",
+                    boxShadow: "0 4px 8px rgba(16,185,129,0.3)",
+                  }}
+                  onMouseOver={(e) => (e.target.style.background = "#047857")}
+                  onMouseOut={(e) => (e.target.style.background = "#059669")}
+                >
+                  Save changes
+                </button>
+              </div>
+            </form>
+          </main>
+        </div>
+      </section>
+    </div>
+  );
+}
