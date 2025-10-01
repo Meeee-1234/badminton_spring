@@ -1,4 +1,4 @@
-// server.js  (CommonJS)
+// server.js (CommonJS)
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -14,7 +14,10 @@ app.use(express.json());
 // ---------- Connect MongoDB ----------
 mongoose
   .connect(process.env.MONGODB_URI)
-  .then(() => console.log("✅ Connected to MongoDB (db: badminton)"))
+  .then(() => {
+    console.log("✅ Connected to MongoDB");
+    console.log("📌 Using DB:", mongoose.connection.db.databaseName); // << เช็คว่า DB ไหน
+  })
   .catch((err) => console.error("❌ MongoDB error:", err.message));
 
 // ---------- User Schema ----------
@@ -67,8 +70,13 @@ app.post("/api/auth/register", async (req, res) => {
 
 // 📄 Get users
 app.get("/api/users", async (req, res) => {
-  const users = await User.find({}, { password: 0 }).lean(); 
-  res.json(users);
+  try {
+    const users = await User.find({}, { password: 0 }).lean(); // ซ่อน password
+    res.json(users);
+  } catch (err) {
+    console.error("Get users error:", err);
+    res.status(500).json({ error: "Server error while fetching users" });
+  }
 });
 
 // ---------- Start Server ----------
