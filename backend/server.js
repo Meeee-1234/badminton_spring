@@ -67,7 +67,7 @@ app.post("/api/auth/register", async (req, res) => {
 
 // 📄 Get users
 app.get("/api/users", async (req, res) => {
-  const users = await User.find({}, { password: 0 }).lean(); // ซ่อน password
+  const users = await User.find({}, { password: 0 }).lean(); 
   res.json(users);
 });
 
