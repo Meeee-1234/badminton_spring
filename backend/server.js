@@ -197,6 +197,7 @@ app.delete("/api/admin/users/:id", isAdmin, async (req, res) => {
 
 
 
+
 // ---------- Routes ----------
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to the Badminton API!" });
