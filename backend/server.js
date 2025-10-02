@@ -84,8 +84,6 @@ async function createAdmin() {
 }
 createAdmin();
 
-
-
 // ---------- Middleware ----------
 function isAdmin(req, res, next) {
   try {
@@ -103,12 +101,32 @@ function isAdmin(req, res, next) {
   }
 }
 
-// route ที่ต้องเป็น admin เท่านั้น
+// ---------- Admin Routes ----------
 app.get("/api/admin/users", isAdmin, async (req, res) => {
-  const users = await User.find({}, { password: 0 });
-  res.json(users);
+  try {
+    const users = await User.find().select("-password");
+    res.json({ users });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
 });
 
+app.get("/api/admin/bookings", isAdmin, async (req, res) => {
+  try {
+    const bookings = await Booking.find().populate("user", "name email");
+    const formatted = bookings.map((b) => ({
+      _id: b._id,
+      user: b.user ? { name: b.user.name, email: b.user.email } : null,
+      date: b.date,
+      court: b.court,
+      hour: b.hour,
+      note: b.note,
+    }));
+    res.json({ bookings: formatted });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch bookings" });
+  }
+});
 
 
 
@@ -353,18 +371,6 @@ app.get("/api/profile/:userId", async (req, res) => {
 
 
 
-// 📄 Get all bookings (admin only)
-app.get("/api/admin/bookings", isAdmin, async (req, res) => {
-  try {
-    const bookings = await Booking.find()
-      .populate("user", "name email phone")
-      .sort({ date: 1, hour: 1 });
-    res.json(bookings);
-  } catch (err) {
-    console.error("❌ Get all bookings error:", err.message);
-    res.status(500).json({ error: "Server error while fetching bookings" });
-  }
-});
 
 
 

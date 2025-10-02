@@ -28,14 +28,13 @@ const colors = {
   taken: "#eef2f4",
 };
 
-/** API paths */
+/** เปลี่ยนเส้นทาง API ให้ตรงกับระบบคุณ */
 const ENDPOINTS = {
   taken: (date) => `${API}/api/bookings/taken?date=${encodeURIComponent(date)}`,
   mine:  (date, userId) => `${API}/api/bookings/mine?date=${encodeURIComponent(date)}&userId=${encodeURIComponent(userId)}`,
   create: `${API}/api/bookings`,
 };
 
-/** Utils */
 const toDateKey = (d = new Date()) => d.toISOString().split("T")[0];
 const msUntilNextMidnight = () => {
   const now = new Date();
@@ -45,27 +44,24 @@ const msUntilNextMidnight = () => {
   return next.getTime() - now.getTime();
 };
 
-// ✅ ทำให้รูปแบบคีย์ตรงกันเสมอ เช่น "1:09" -> "1:9"
-const normKey = (k) => {
-  if (typeof k !== "string") return "";
-  const [c, h] = k.split(":");
-  return `${Number(c)}:${Number(h)}`;
-};
-
 export default function Details() {
   const navigate = useNavigate();
 
-  // state
+  // 🔒 วัน “วันนี้” อัตโนมัติ
   const [dateKey, setDateKey] = useState(() => toDateKey());
-  const [taken, setTaken] = useState([]);   // ["คอร์ต:ชั่วโมง"]
-  const [mine, setMine]   = useState([]);   // ["คอร์ต:ชั่วโมง"] ของผู้ใช้ปัจจุบัน
+  const [taken, setTaken] = useState([]);       // ["1:9","2:10"]
+  const [mine, setMine]   = useState([]);       // ["1:9","2:10"] ของผู้ใช้
   const [selected, setSelected] = useState([]); // [{court, hour}]
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
-  // auto-fit-to-screen
+  // ✅ สเกลอัตโนมัติให้ “พอดีจอ”
+  const [scale, setScale] = useState(1);
+  const viewportRef = useRef(null);
   const contentRef = useRef(null);
+
+  // คำนวณ scale เมื่อโหลด/เปลี่ยนขนาดหน้าต่าง/เนื้อหา
   useLayoutEffect(() => {
     const calc = () => {
       const ct = contentRef.current;
@@ -87,26 +83,33 @@ export default function Details() {
       ct.style.transform = `scale(${s})`;
       ct.style.transformOrigin = "top left";
       ct.style.width = s < 1 ? `${100 / s}%` : "auto";
+      setScale(s);
 
       document.documentElement.style.overflow = "hidden";
       document.body.style.overflow = "hidden";
     };
 
     calc();
+    const onResize = () => calc();
+
     const ro = new ResizeObserver(calc);
     if (contentRef.current) ro.observe(contentRef.current);
-    window.addEventListener("resize", calc);
+
+    window.addEventListener("resize", onResize);
     return () => {
-      window.removeEventListener("resize", calc);
+      window.removeEventListener("resize", onResize);
       ro.disconnect();
       document.documentElement.style.overflow = "";
       document.body.style.overflow = "";
     };
   }, []);
 
-  // auto date at midnight
+  // อัปเดตเป็นวันใหม่อัตโนมัติเที่ยงคืน
   useEffect(() => {
-    const tick = () => setDateKey(toDateKey());
+    const tick = () => {
+      const today = toDateKey();
+      setDateKey((prev) => (prev !== today ? today : prev));
+    };
     tick();
     const first = setTimeout(() => {
       tick();
@@ -122,55 +125,47 @@ export default function Details() {
     };
   }, []);
 
-  // load taken + mine (normalize key ให้เรียบร้อย)
+  // โหลดสถานะจอง (รวม “ของฉัน”)
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+
+    const load = async () => {
       try {
-        const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
-
-        // taken
-        const tRes = await fetch(ENDPOINTS.taken(dateKey));
+        const [tRes, user] = await Promise.all([
+          fetch(ENDPOINTS.taken(dateKey)),
+          Promise.resolve(JSON.parse(localStorage.getItem("auth:user") || "{}")),
+        ]);
         const tJson = await tRes.json();
-        if (!cancelled) setTaken((tJson.taken || []).map(normKey));
+        if (!cancelled) setTaken(tJson.taken || []);
 
-        // mine (รองรับทั้ง {mine:[...]} หรือ {items:[{court,hour}]})
         if (user?._id) {
           try {
             const mRes = await fetch(ENDPOINTS.mine(dateKey, user._id));
-            if (mRes.ok) {
-              const mJson = await mRes.json();
-              if (Array.isArray(mJson.mine)) {
-                if (!cancelled) setMine(mJson.mine.map(normKey));
-              } else if (Array.isArray(mJson.items)) {
-                if (!cancelled) setMine(mJson.items.map(it => normKey(`${it.court}:${it.hour}`)));
-              } else {
-                if (!cancelled) setMine([]);
-              }
-            } else {
-              if (!cancelled) setMine([]);
-            }
+            if (!mRes.ok) throw new Error("mine endpoint not available");
+            const mJson = await mRes.json();
+            if (!cancelled) setMine(mJson.mine || []);
           } catch {
-            if (!cancelled) setMine([]);
+            if (!cancelled) setMine([]); // fallback ถ้ายังไม่มี endpoint
           }
         } else {
           if (!cancelled) setMine([]);
         }
-      } catch (e) {
-        console.error("load error:", e);
+      } catch (err) {
+        console.error("Load bookings error:", err);
       }
-    })();
+    };
+
+    load();
     return () => { cancelled = true; };
   }, [dateKey]);
 
-  /** helpers */
   const formatHourLabel = (h) => `${h.toString().padStart(2, "0")}:00 - ${h + 1}:00`;
   const isTaken = (c, h) => taken.includes(`${c}:${h}`);
   const isMine  = (c, h) => mine.includes(`${c}:${h}`);
   const isSelected = (c, h) => selected.some((s) => s.court === c && s.hour === h);
 
   const toggleCell = (c, h) => {
-    if (isTaken(c, h)) return; // เต็มแล้วห้ามกดเลือก
+    if (isTaken(c, h)) return; // ช่องจองแล้วคลิกไม่ได้
     setSelected((prev) =>
       prev.some((s) => s.court === c && s.hour === h)
         ? prev.filter((s) => !(s.court === c && s.hour === h))
@@ -211,7 +206,7 @@ export default function Details() {
       setSelected([]);
       setNote("");
 
-      // reload
+      // reload ตาราง + mine
       const [tRes, mRes] = await Promise.all([
         fetch(ENDPOINTS.taken(dateKey)),
         (async () => {
@@ -224,51 +219,60 @@ export default function Details() {
         })(),
       ]);
       const tJson = await tRes.json();
-      setTaken((tJson.taken || []).map(normKey));
+      setTaken(tJson.taken || []);
       if (mRes) {
         const mJson = await mRes.json();
-        if (Array.isArray(mJson.mine)) {
-          setMine(mJson.mine.map(normKey));
-        } else if (Array.isArray(mJson.items)) {
-          setMine(mJson.items.map(it => normKey(`${it.court}:${it.hour}`)));
-        } else {
-          setMine([]);
-        }
+        setMine(mJson.mine || []);
       }
-    } catch (e) {
-      console.error("booking error:", e);
+    } catch (err) {
+      console.error("Booking error:", err);
       setMsg("❌ Server error");
     } finally {
       setLoading(false);
     }
   };
 
+  
+
+  
+
   const goHome = () => {
     try { navigate("/"); } catch { window.location.href = "/"; }
   };
 
   return (
-    <div style={ui.page}>
+    <div ref={viewportRef} style={ui.page}>
+      {/* ✅ ตัวคอนเทนต์จริง — จะถูกสเกลให้พอดีจออัตโนมัติ */}
       <div ref={contentRef} style={ui.contentWrap}>
         <div style={ui.container}>
           {/* ซ้าย: ตาราง */}
           <section style={ui.left}>
             <div style={ui.toolbar}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <button type="button" onClick={goHome} style={ui.backBtn}>← กลับหน้าแรก</button>
+                <button type="button" onClick={goHome} style={ui.backBtn} title="กลับหน้าแรก">
+                  ← กลับหน้าแรก
+                </button>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <label htmlFor="date" style={ui.labelSm}>วันที่ (อัตโนมัติ)</label>
-                  <input id="date" type="date" value={dateKey} disabled readOnly style={{ ...ui.dateInput, background: colors.primarySoft, borderColor: colors.primary }} />
+                  <input
+                    id="date"
+                    type="date"
+                    value={dateKey}
+                    disabled
+                    readOnly
+                    title="ระบบจะอัปเดตเป็นวันใหม่โดยอัตโนมัติทุกเที่ยงคืน"
+                    style={{ ...ui.dateInput, background: colors.primarySoft, borderColor: colors.primary }}
+                  />
                   <span style={ui.badgeNote}>ตาราง “วันนี้” • อัปเดตอัตโนมัติเที่ยงคืน</span>
                 </div>
               </div>
 
-              {/* Legend */}
-              <div style={ui.legendWrap}>
-                <span style={ui.legendItem}><span style={ui.dotMine} /> เต็ม (ของฉัน)</span>
-                <span style={ui.legendItem}><span style={ui.dotTaken} /> เต็ม (คนอื่น)</span>
+              {/* Legend สถานะ */}
+              <div style={ui.legendWrap} aria-hidden>
+                <span style={ui.legendItem}><span style={ui.dotMine} /> ของฉัน</span>
                 <span style={ui.legendItem}><span style={ui.dotPicked} /> เลือกแล้ว</span>
                 <span style={ui.legendItem}><span style={ui.dotFree} /> ว่าง</span>
+                <span style={ui.legendItem}><span style={ui.dotTaken} /> เต็ม</span>
               </div>
             </div>
 
@@ -281,42 +285,41 @@ export default function Details() {
                 ))}
               </div>
 
-              {HOURS.map((h, idx) => (
-                <div key={h} style={{ ...ui.row, ...(idx % 2 === 1 ? ui.rowAlt : null) }}>
-                  <div style={ui.timeCell}>{formatHourLabel(h)}</div>
-                  {COURTS.map((c) => {
-                    const takenCell = isTaken(c, h);
-                    const mineCell  = isMine(c, h);
-                    const picked    = isSelected(c, h);
+              <div role="table" aria-label="ตารางการจองคอร์ตแบดมินตัน" style={ui.bodyGrid}>
+                {HOURS.map((h, idx) => (
+                  <div key={h} role="row" style={{ ...ui.row, ...(idx % 2 === 1 ? ui.rowAlt : null) }}>
+                    <div role="cell" style={{ ...ui.timeCell }}>{formatHourLabel(h)}</div>
+                    {COURTS.map((c) => {
+                      const takenCell = isTaken(c, h);
+                      const mineCell  = isMine(c, h);
+                      const picked    = isSelected(c, h);
 
-                    // คำที่แสดงในแคปซูล (ยังคงเป็น "เต็ม")
-                    const label = takenCell ? "เต็ม" : (picked ? "เลือกแล้ว" : "ว่าง");
+                      const label = takenCell ? (mineCell ? "ของฉัน" : "เต็ม") : (picked ? "เลือกแล้ว" : "ว่าง");
+                      const styleForCell =
+                        takenCell ? (mineCell ? ui.cellMine : ui.cellTaken)
+                                  : (picked ? ui.cellPicked : ui.cellFree);
 
-                    // สีพื้นหลังของเซลล์: ใช้เทาอ่อนเมื่อเต็ม (ไม่ว่าของใคร) เพื่อความสม่ำเสมอ
-                    const styleForCell =
-                      takenCell ? ui.cellTaken : (picked ? ui.cellPicked : ui.cellFree);
+                      // ✅ ของฉัน: ไม่ใช้ disabled จริง เพื่อไม่ให้ซีด แต่กันกดด้วย pointerEvents
+                      const commonBtnStyle = { ...ui.cellBtn, ...styleForCell };
+                      const btnProps = mineCell
+                        ? { disabled: false, "aria-disabled": true, style: { ...commonBtnStyle, ...ui.mineNoDim } }
+                        : { disabled: takenCell, style: commonBtnStyle };
 
-                    // ของฉัน: ห้ามกด แต่ไม่ใช้ disabled จริง (กันสีซีด)
-                    const commonBtnStyle = { ...ui.cellBtn, ...styleForCell };
-                    const btnProps = mineCell
-                      ? { disabled: false, "aria-disabled": true, style: { ...commonBtnStyle, ...ui.mineNoDim } }
-                      : { disabled: takenCell, style: commonBtnStyle };
-
-                    return (
-                      <button
-                        key={`${c}:${h}`}
-                        onClick={() => toggleCell(c, h)}
-                        aria-pressed={picked}
-                        aria-label={`คอร์ต ${c} เวลา ${formatHourLabel(h)}: ${label}${mineCell ? " (ของฉัน)" : ""}`}
-                        {...btnProps}
-                      >
-                        {/* ✅ ถ้าเป็น “เต็มของฉัน” ตัวหนังสือ/กรอบ/พื้นแคปซูลจะเป็นสีเขียว */}
-                        <span style={ui.statusPill(takenCell, picked, mineCell)}>{label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
+                      return (
+                        <button
+                          key={`${c}:${h}`}
+                          onClick={() => toggleCell(c, h)}
+                          aria-pressed={picked}
+                          aria-label={`คอร์ต ${c} เวลา ${formatHourLabel(h)}: ${label}`}
+                          {...btnProps}
+                        >
+                          <span style={ui.statusPill(takenCell, picked, mineCell)}>{label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
             </div>
           </section>
 
@@ -328,17 +331,55 @@ export default function Details() {
               <div style={ui.summaryRow}><span>จำนวนรายการ</span><b>{selected.length} ชั่วโมง</b></div>
               <div style={ui.summaryRow}><span>ราคา/ชั่วโมง</span><b>{PRICE_PER_HOUR.toLocaleString()} บาท</b></div>
               <div style={{ ...ui.summaryRow, borderTop: `1px dashed ${colors.line}`, paddingTop: 10, marginTop: 6 }}>
-                <span>รวมทั้งสิ้น</span><b style={{ color: colors.accent }}>{(selected.length * PRICE_PER_HOUR).toLocaleString()} บาท</b>
+                <span>รวมทั้งสิ้น</span>
+                <b style={{ color: colors.accent }}>
+                  {(selected.length * PRICE_PER_HOUR).toLocaleString()} บาท
+                </b>
               </div>
 
               <div style={{ marginTop: 12 }}>
                 <label htmlFor="note" style={ui.labelSm}>หมายเหตุ (ถ้ามี)</label>
-                <textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="เช่น ต้องการคอร์ตติดผนัง / เปิดไฟเพิ่ม" style={ui.textarea} rows={3} />
+                <textarea
+                  id="note"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="เช่น ต้องการคอร์ตติดผนัง / เปิดไฟเพิ่ม"
+                  style={ui.textarea}
+                  rows={3}
+                />
               </div>
 
-              <button onClick={handleConfirm} disabled={loading || !selected.length} style={{ ...ui.confirmBtn, opacity: loading ? 0.75 : 1 }}>
+              <button
+                onClick={handleConfirm}
+                disabled={loading || !selected.length}
+                style={{ ...ui.confirmBtn, opacity: loading ? 0.75 : 1 }}
+              >
                 {loading ? "กำลังยืนยัน..." : "ยืนยันการจอง"}
               </button>
+
+              {!!selected.length && (
+                <>
+                  <div style={{ marginTop: 14, fontSize: 13, color: colors.muted }}>รายการที่เลือก</div>
+                  <ul style={ui.selectedList}>
+                    {selected
+                      .slice()
+                      .sort((a, b) => a.court - b.court || a.hour - b.hour)
+                      .map((s, idx) => (
+                        <li key={idx} style={ui.selectedItem}>
+                          <span>คอร์ต {s.court}</span>
+                          <span>{formatHourLabel(s.hour)}</span>
+                          <button
+                            onClick={() => toggleCell(s.court, s.hour)}
+                            style={ui.removeBtn}
+                            title="เอาออก"
+                          >
+                            ✕
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                </>
+              )}
 
               {msg && <div style={ui.message}>{msg}</div>}
             </div>
@@ -349,17 +390,23 @@ export default function Details() {
   );
 }
 
-/** ===== UI ===== */
+/** ===== UI (ออกแบบให้สวย แล้วสเกลทั้งบล็อกให้พอดีจอ) ===== */
 const ui = {
   page: {
     minHeight: "100vh",
     background: colors.bg,
     color: colors.ink,
-    fontFamily: 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", sans-serif',
+    fontFamily:
+      'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", sans-serif',
     padding: 8,
     overflow: "hidden",
   },
-  contentWrap: { transform: "scale(1)", transformOrigin: "top left", width: "auto" },
+
+  contentWrap: {
+    transform: "scale(1)",
+    transformOrigin: "top left",
+    width: "auto",
+  },
 
   container: {
     width: 1200,
@@ -423,9 +470,9 @@ const ui = {
   dotFree:  { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: "#fff", border: `1px solid ${colors.lineStrong}` },
   dotPicked:{ display: "inline-block", width: 12, height: 12, borderRadius: 999, background: colors.primary, border: `1px solid ${colors.primaryDark}` },
   dotTaken: { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: colors.taken, border: `1px solid ${colors.lineStrong}` },
-  dotMine:  { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: "#bbf7d0", border: `1px solid ${colors.success}` },
+  dotMine:  { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: "#dcfce7", border: `1px solid ${colors.success}` },
 
-  /* Table */
+  /* กรอบตาราง */
   tableFrame: {
     background: colors.card,
     border: `1px solid ${colors.lineStrong}`,
@@ -447,9 +494,18 @@ const ui = {
     textAlign: "center",
     borderLeft: `1px solid ${colors.lineStrong}`,
     color: colors.primaryDark,
+    letterSpacing: 0.2,
   },
 
-  row: { display: "grid", gridTemplateColumns: `140px repeat(${COURTS.length}, 1fr)`, borderTop: `1px solid ${colors.line}` },
+  bodyGrid: {
+    display: "grid",
+    gridAutoFlow: "row",
+  },
+  row: {
+    display: "grid",
+    gridTemplateColumns: `140px repeat(${COURTS.length}, 1fr)`,
+    borderTop: `1px solid ${colors.line}`,
+  },
   rowAlt: { background: "#fbfdfc" },
   timeCell: {
     padding: "12px 10px",
@@ -460,7 +516,6 @@ const ui = {
     fontWeight: 700,
   },
 
-  /* Cell */
   cellBtn: {
     padding: "14px 8px",
     fontSize: 13,
@@ -475,36 +530,54 @@ const ui = {
     outline: "none",
   },
   cellFree:   { background: "#fff" },
-  cellPicked: { background: colors.primarySoft, boxShadow: "inset 0 0 0 2px " + colors.primary },
-  cellTaken:  { background: colors.taken, color: "#9ca3af" },
-
-  // ป้องกันคลิกในกรณี "ของฉัน" โดยไม่ใช้ disabled (จะได้ไม่ซีด)
-  mineNoDim: { pointerEvents: "none", cursor: "not-allowed", opacity: 1, filter: "none" },
-
-  // แคปซูลคำสถานะ — ทำให้ "เต็มของฉัน" เป็นสีเขียวชัดเจน
-  statusPill: (isTaken, isPicked, isMine) => {
-    const isMyTaken = isTaken && isMine;
-    return {
-      fontSize: 12,
-      fontWeight: 800,
-      padding: "6px 10px",
-      borderRadius: 999,
-      border: `1px solid ${
-        isMyTaken ? colors.success :
-        isTaken   ? colors.lineStrong :
-        isPicked  ? colors.primaryDark : colors.lineStrong
-      }`,
-      background: isMyTaken ? "#eaffef"
-                : isTaken   ? "#f1f5f9"
-                : isPicked  ? "#dcfce7" : "#ffffff",
-      color:      isMyTaken ? colors.success
-                : isTaken   ? "#94a3b8"
-                : isPicked  ? colors.success : colors.ink,
-      letterSpacing: 0.2,
-    };
+  cellPicked: {
+    background: colors.primarySoft,
+    boxShadow: "inset 0 0 0 2px " + colors.primary,
+  },
+  cellTaken:  {
+    background: colors.taken,
+    color: "#9ca3af",
+    cursor: "not-allowed",
+  },
+  // ✅ สีเขียวสำหรับ “ของฉัน”
+  cellMine: {
+    background: "#bbf7d0", // เขียวสด (tailwind: green-300)
+    boxShadow: `inset 0 0 0 2px ${colors.success}`,
+    color: "#065f46",
+    fontWeight: 700,
+    cursor: "not-allowed",
+  },
+  // ป้องกันปุ่มซีด/หรี่เวลาเป็นของฉัน (ไม่ใช้ disabled จริง แต่ให้กดไม่ติด)
+  mineNoDim: {
+    pointerEvents: "none",
+    cursor: "not-allowed",
+    opacity: 1,
+    filter: "none",
   },
 
-  /* Right (สรุป) */
+  statusPill: (isTaken, isPicked, isMine) => ({
+    fontSize: 12,
+    fontWeight: 800,
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: `1px solid ${
+      isMine ? colors.success
+      : isTaken ? colors.lineStrong
+      : isPicked ? colors.primaryDark
+      : colors.lineStrong
+    }`,
+    background: isMine
+      ? "#22c55e" // เขียวชัด (tailwind: green-400)
+      : (isTaken
+          ? "#f1f5f9"
+          : isPicked
+            ? "#dcfce7"
+            : "#ffffff"),
+    color: isMine ? "#fff" : (isTaken ? "#94a3b8" : isPicked ? colors.success : colors.ink),
+    letterSpacing: 0.2,
+  }),
+
+  /* Right */
   right: { minWidth: 0 },
   card: {
     background: colors.card,
@@ -516,7 +589,13 @@ const ui = {
     top: 0,
   },
   cardTitle: { margin: 0, fontSize: 18, fontWeight: 900, color: colors.primaryDark },
-  summaryRow: { display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 14, marginTop: 10 },
+  summaryRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    fontSize: 14,
+    marginTop: 10,
+  },
   textarea: {
     width: "100%",
     padding: "10px 14px",
@@ -529,6 +608,44 @@ const ui = {
     resize: "vertical",
     boxSizing: "border-box",
   },
-  confirmBtn: { width: "100%", marginTop: 12, padding: "12px 14px", background: colors.primaryDark, color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontWeight: 800, fontSize: 15 },
-  message: { marginTop: 10, fontSize: 14, textAlign: "center", color: colors.accent },
+  confirmBtn: {
+    width: "100%",
+    marginTop: 12,
+    padding: "12px 14px",
+    background: colors.primaryDark,
+    color: "#fff",
+    border: "none",
+    borderRadius: 12,
+    cursor: "pointer",
+    fontWeight: 800,
+    fontSize: 15,
+  },
+  selectedList: {
+    marginTop: 8,
+    listStyle: "none",
+    padding: 0,
+    borderTop: `1px solid ${colors.line}`,
+  },
+  selectedItem: {
+    display: "grid",
+    gridTemplateColumns: "auto 1fr auto",
+    gap: 8,
+    alignItems: "center",
+    padding: "8px 0",
+    fontSize: 13,
+    borderBottom: `1px dashed ${colors.line}`,
+  },
+  removeBtn: {
+    background: "transparent",
+    border: `1px solid ${colors.line}`,
+    borderRadius: 8,
+    padding: "2px 8px",
+    cursor: "pointer",
+  },
+  message: {
+    marginTop: 10,
+    fontSize: 14,
+    textAlign: "center",
+    color: colors.accent,
+  },
 };

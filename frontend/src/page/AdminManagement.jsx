@@ -1,6 +1,7 @@
+
 import React, { useEffect, useState } from "react";
 
-const API = "https://badminton-hzwm.onrender.com";
+const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
 
 export default function AdminManagement() {
   const [users, setUsers] = useState([]);
@@ -31,13 +32,16 @@ export default function AdminManagement() {
           throw new Error("โหลดข้อมูลไม่สำเร็จ");
         }
 
-        const usersData = await userRes.json();
-        const bookingsData = await bookingRes.json();
+        const [userData, bookingData] = await Promise.all([
+          userRes.json(),
+          bookingRes.json(),
+        ]);
 
-        setUsers(usersData);
-        setBookings(bookingsData);
+        setUsers(userData.users || []);
+        setBookings(bookingData.bookings || []);
       } catch (err) {
-        setMessage(`❌ Error: ${err.message}`);
+        console.error("โหลดข้อมูลล้มเหลว:", err);
+        setMessage("❌ โหลดข้อมูลไม่สำเร็จ");
       } finally {
         setLoading(false);
       }
@@ -46,68 +50,175 @@ export default function AdminManagement() {
     fetchData();
   }, []);
 
-  if (loading) return <p className="p-4">⏳ กำลังโหลดข้อมูล...</p>;
-  if (message) return <p className="p-4 text-red-500">{message}</p>;
-
   return (
-    <div className="p-6 space-y-10">
-      <h1 className="text-2xl font-bold">📊 Admin Management</h1>
+    <div
+      style={{
+        padding: 20,
+        fontFamily: "Segoe UI, sans-serif",
+        background: "#f9fafb",
+        minHeight: "100vh",
+      }}
+    >
+      <h1
+        style={{
+          fontSize: 28,
+          fontWeight: 800,
+          marginBottom: 20,
+          textAlign: "center",
+        }}
+      >
+        📊 Admin Management
+      </h1>
+
+      {/* ✅ แสดงข้อความ error หรือกำลังโหลด */}
+      {loading && <p style={{ textAlign: "center" }}>⏳ กำลังโหลด...</p>}
+      {message && (
+        <div
+          style={{
+            background: "#fee2e2",
+            color: "#b91c1c",
+            padding: "10px 14px",
+            borderRadius: 8,
+            marginBottom: 20,
+            textAlign: "center",
+            fontWeight: 600,
+          }}
+        >
+          {message}
+        </div>
+      )}
 
       {/* Users Table */}
-      <div>
-        <h2 className="text-xl font-semibold mb-2">👤 Users</h2>
-        <table className="min-w-full border border-gray-300">
-          <thead className="bg-gray-200">
-            <tr>
-              <th className="px-3 py-2 border">Name</th>
-              <th className="px-3 py-2 border">Email</th>
-              <th className="px-3 py-2 border">Phone</th>
-              <th className="px-3 py-2 border">Role</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u._id} className="hover:bg-gray-100">
-                <td className="px-3 py-2 border">{u.name}</td>
-                <td className="px-3 py-2 border">{u.email}</td>
-                <td className="px-3 py-2 border">{u.phone}</td>
-                <td className="px-3 py-2 border">{u.role}</td>
+      <section style={{ marginBottom: 40 }}>
+        <h2
+          style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}
+        >
+          👤 Users
+        </h2>
+        <div
+          style={{
+            overflowX: "auto",
+            background: "#fff",
+            borderRadius: 10,
+            boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
+          }}
+        >
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th
+                  style={{
+                    padding: 12,
+                    background: "#10b981",
+                    color: "#fff",
+                    textAlign: "left",
+                    fontWeight: 600,
+                  }}
+                >
+                  ID
+                </th>
+                <th style={{ padding: 12, background: "#10b981", color: "#fff" }}>ชื่อ</th>
+                <th style={{ padding: 12, background: "#10b981", color: "#fff" }}>Email</th>
+                <th style={{ padding: 12, background: "#10b981", color: "#fff" }}>Phone</th>
+                <th style={{ padding: 12, background: "#10b981", color: "#fff" }}>isAdmin</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {users.length > 0 ? (
+                users.map((u) => (
+                  <tr key={u._id}>
+                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u._id}</td>
+                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u.name}</td>
+                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u.email}</td>
+                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
+                      {u.phone || "-"}
+                    </td>
+                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
+                      {u.role === "admin" ? "✅" : "❌"}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan={5}
+                    style={{ textAlign: "center", color: "#9ca3af", padding: 10 }}
+                  >
+                    ไม่มีข้อมูลผู้ใช้
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       {/* Bookings Table */}
-      <div>
-        <h2 className="text-xl font-semibold mb-2">🏸 All Bookings</h2>
-        <table className="min-w-full border border-gray-300">
-          <thead className="bg-gray-200">
-            <tr>
-              <th className="px-3 py-2 border">User</th>
-              <th className="px-3 py-2 border">Email</th>
-              <th className="px-3 py-2 border">Date</th>
-              <th className="px-3 py-2 border">Court</th>
-              <th className="px-3 py-2 border">Hour</th>
-              <th className="px-3 py-2 border">Note</th>
-            </tr>
-          </thead>
-          <tbody>
-            {bookings.map((b) => (
-              <tr key={b._id} className="hover:bg-gray-100">
-                <td className="px-3 py-2 border">{b.user?.name}</td>
-                <td className="px-3 py-2 border">{b.user?.email}</td>
-                <td className="px-3 py-2 border">{b.date}</td>
-                <td className="px-3 py-2 border">{b.court}</td>
-                <td className="px-3 py-2 border">
-                  {b.hour}:00 - {b.hour + 1}:00
-                </td>
-                <td className="px-3 py-2 border">{b.note || "-"}</td>
+      <section style={{ marginBottom: 40 }}>
+        <h2
+          style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}
+        >
+          📝 Bookings
+        </h2>
+        <div
+          style={{
+            overflowX: "auto",
+            background: "#fff",
+            borderRadius: 10,
+            boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
+          }}
+        >
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                {["ID", "User", "Date", "Court", "Hour", "Note"].map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      padding: 12,
+                      background: "#10b981",
+                      color: "#fff",
+                      textAlign: "left",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {bookings.length > 0 ? (
+                bookings.map((b) => (
+                  <tr key={b._id}>
+                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{b._id}</td>
+                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
+                      {b.user?.name || "-"}
+                    </td>
+                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{b.date}</td>
+                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{b.court}</td>
+                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
+                      {`${b.hour}:00 - ${b.hour + 1}:00`}
+                    </td>
+                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
+                      {b.note || "-"}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan={6}
+                    style={{ textAlign: "center", color: "#9ca3af", padding: 10 }}
+                  >
+                    ไม่มีข้อมูลการจอง
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }
