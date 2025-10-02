@@ -59,7 +59,11 @@ const bookingSchema = new mongoose.Schema(
     date: { type: String, required: true }, // YYYY-MM-DD
     court: { type: Number, required: true }, // คอร์ต 1-6
     hour: { type: Number, required: true },  // ชั่วโมง เช่น 9 = 9:00-10:00
-    note: { type: String },
+    status: { 
+      type: String, 
+      enum: ["booked", "arrived", "canceled"], 
+      default: "booked" 
+    }, // ✅ สถานะการจอง
   },
   { timestamps: true, collection: "bookings" }
 );
@@ -348,20 +352,26 @@ app.post("/api/bookings", async (req, res) => {
   }
 });
 
-// ✅ ดูการจองของ user
-app.get("/api/bookings/my/:userId", async (req, res) => {
+// ✅ ดูการจองของ user ตามวัน
+app.get("/api/bookings/my/:userId/:date", async (req, res) => {
   try {
-    const { userId } = req.params;
-    const myBookings = await Booking.find({ user: userId })
-      .populate("user", "name email")
-      .sort({ date: 1, hour: 1 });
+    const { userId, date } = req.params;
 
-    res.json(myBookings);
+    if (!date) {
+      return res.status(400).json({ error: "ต้องส่ง date" });
+    }
+
+    const myBookings = await Booking.find({ user: userId, date })
+      .sort({ hour: 1 });
+
+    const mine = myBookings.map(b => `${b.court}:${b.hour}`);
+    res.json({ mine });
   } catch (err) {
     console.error("❌ My bookings error:", err.message);
     res.status(500).json({ error: "Server error" });
   }
 });
+
 
 
 // POST หรือ PUT profile
