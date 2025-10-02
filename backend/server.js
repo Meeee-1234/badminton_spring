@@ -72,8 +72,8 @@ const bookingSchema = new mongoose.Schema(
 const Booking = mongoose.model("Booking", bookingSchema);
 
 // ===== Auth Middleware =====
-const jwt = require("jsonwebtoken");
-const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
+//const jwt = require("jsonwebtoken");
+//const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
 
 
