@@ -53,6 +53,8 @@ export default function Login() {
     }
   };
 
+  
+
   return (
     <div style={ui.page}>
       <div style={ui.card}>
@@ -144,7 +146,7 @@ const ui = {
   title: { margin: 0, fontSize: 24, fontWeight: 800, color: colors.ink, textAlign: "center" },
   sub: { margin: "6px 0 0 0", color: colors.muted, fontSize: 14, textAlign: "center" },
   field: { marginTop: 16 },
-  label: { display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 },
+  label: { display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6,textAlign: "left" },
 
   // 🔥 แก้ให้ input และปุ่มตาอยู่ในกล่องเดียวกัน
   inputWrap: {

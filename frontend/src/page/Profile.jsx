@@ -1,42 +1,154 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+const API = "https://badminton-hzwm.onrender.com";
 
 export default function Profile() {
+  const navigate = useNavigate();
+  const [form, setForm] = useState({ name: "", email: "", phone: "" });
+  const [message, setMessage] = useState("");
+  const [userId, setUserId] = useState(null);
+
+  // โหลดข้อมูล user จาก localStorage
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
+    if (user?._id) {
+      setUserId(user._id); // ✅ ใช้ _id
+      setForm({ name: user.name, email: user.email, phone: user.phone });
+    }
+  }, []);
+
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setMessage("⏳ กำลังบันทึก...");
+    try {
+      const res = await fetch(`${API}/api/users/${userId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: form.name, phone: form.phone }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setMessage("✅ อัพเดตข้อมูลสำเร็จ");
+        // ✅ เก็บ user ใหม่ลง localStorage
+        localStorage.setItem("auth:user", JSON.stringify(data.user));
+      } else {
+        setMessage(`❌ ${data.error || "อัพเดตไม่สำเร็จ"}`);
+      }
+    } catch (err) {
+      console.error("Update error:", err);
+      setMessage("❌ Server error");
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("auth:token");
+    localStorage.removeItem("auth:user");
+    navigate("/login");
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: "#f9fafb" }}>
       {/* HERO */}
-        <section style={{ position: "relative" }}>
-            <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "40px 20px" }}>
+      <section style={{ position: "relative" }}>
+        <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "40px 20px" }}>
+          <div style={{ textAlign: "left" }}>
+            <a
+              href="/"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                borderRadius: "12px",
+                border: "1px solid #6ee7b7",
+                background: "#ecfdf5",
+                padding: "8px 16px",
+                color: "#065f46",
+                fontWeight: "600",
+                textDecoration: "none",
+                marginBottom: "20px",
+              }}
+            >
+              ← กลับหน้าแรก
+            </a>
+          </div>
 
-                <div  style={{ textAlign: "left" }}>
-                    <a href="/" style={{ display: "inline-flex", alignItems: "center", gap: "8px", borderRadius: "12px", border: "1px solid #6ee7b7", background: "#ecfdf5",
-                    padding: "8px 16px", color: "#065f46", fontWeight: "600", textDecoration: "none", marginBottom: "20px", marginLeft: "0", }} > 
-                    ← กลับหน้าแรก 
-                    </a>
-                </div>
+          <h1
+            style={{
+              fontSize: "2.2rem",
+              fontWeight: "800",
+              color: "#064e3b",
+              textAlign: "center",
+            }}
+          >
+            Your Profile
+          </h1>
+          <p
+            style={{
+              color: "#4b5563",
+              marginTop: "10px",
+              maxWidth: "700px",
+              textAlign: "center",
+              marginLeft: "auto",
+              marginRight: "auto",
+            }}
+          >
+            จัดการข้อมูลบัญชีของคุณ และอัปเดตเบอร์ติดต่อเพื่อการจองที่รวดเร็วขึ้น
+          </p>
+        </div>
+      </section>
 
-                <h1 style={{ fontSize: "2.2rem", fontWeight: "800", color: "#064e3b", textAlign: "center", }} > Your Profile </h1>
-                <p style={{ color: "#4b5563", marginTop: "10px", maxWidth: "700px", textAlign: "center", marginLeft: "auto", marginRight: "auto", }} >
-                    จัดการข้อมูลบัญชีของคุณ และอัปเดตเบอร์ติดต่อเพื่อการจองที่รวดเร็วขึ้น
-                </p>
-            </div>
-        </section>
-
-        <section style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 20px 60px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "24px", }} >
-
-            <aside>
-            <div style={{ borderRadius: "16px", border: "1px solid #e5e7eb", background: "white", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", padding: "24px", }} >
+      {/* CONTENT */}
+      <section style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 20px 60px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "24px" }}>
+          {/* LEFT CARD */}
+          <aside>
+            <div
+              style={{
+                borderRadius: "16px",
+                border: "1px solid #e5e7eb",
+                background: "white",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                padding: "24px",
+              }}
+            >
               <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                
-                <div style={{ height: "56px", width: "56px", borderRadius: "50%", background: "#d1fae5", color: "#065f46", display: "flex", alignItems: "center",
-                              justifyContent: "center", fontWeight: "800",fontSize: "18px", }} > </div>
-                    <div>
-                  <div style={{ fontSize: "20px", fontWeight: "700", color: "#111827" }}> User Name </div>
-                  <div style={{ fontSize: "14px", color: "#6b7280" }}>user@example.com</div>
+                <div
+                  style={{
+                    height: "56px",
+                    width: "56px",
+                    borderRadius: "50%",
+                    background: "#d1fae5",
+                    color: "#065f46",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: "800",
+                    fontSize: "18px",
+                  }}
+                >
+                  {form.name?.[0] || "U"}
+                </div>
+                <div>
+                  <div style={{ fontSize: "20px", fontWeight: "700", color: "#111827" }}>
+                    {form.name}
+                  </div>
+                  <div style={{ fontSize: "14px", color: "#6b7280" }}>{form.email}</div>
                 </div>
               </div>
 
-              <div style={{ marginTop: "24px", fontSize: "14px", borderTop: "1px solid #e5e7eb" }}>
+              <div
+                style={{
+                  marginTop: "24px",
+                  fontSize: "14px",
+                  borderTop: "1px solid #e5e7eb",
+                }}
+              >
                 <div
                   style={{
                     padding: "12px 0",
@@ -45,23 +157,13 @@ export default function Profile() {
                   }}
                 >
                   <span style={{ color: "#6b7280" }}>Phone</span>
-                  <span style={{ fontWeight: "500", color: "#111827" }}>081-234-5678</span>
-                </div>
-                <div
-                  style={{
-                    padding: "12px 0",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    borderTop: "1px solid #e5e7eb",
-                  }}
-                >
-                  <span style={{ color: "#6b7280" }}>Member since</span>
-                  <span style={{ fontWeight: "500", color: "#111827" }}>01/01/2024</span>
+                  <span style={{ fontWeight: "500", color: "#111827" }}>{form.phone}</span>
                 </div>
               </div>
 
               <div style={{ marginTop: "24px" }}>
                 <button
+                  onClick={handleLogout}
                   style={{
                     width: "100%",
                     borderRadius: "12px",
@@ -82,9 +184,10 @@ export default function Profile() {
             </div>
           </aside>
 
-          {/* RIGHT: EDIT FORM */}
+          {/* RIGHT FORM */}
           <main>
             <form
+              onSubmit={handleSave}
               style={{
                 borderRadius: "16px",
                 border: "1px solid #e5e7eb",
@@ -93,7 +196,14 @@ export default function Profile() {
                 padding: "24px",
               }}
             >
-              <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#065f46", marginBottom: "16px" }}>
+              <h2
+                style={{
+                  fontSize: "20px",
+                  fontWeight: "700",
+                  color: "#065f46",
+                  marginBottom: "16px",
+                }}
+              >
                 แก้ไขข้อมูล
               </h2>
 
@@ -104,7 +214,9 @@ export default function Profile() {
                   </label>
                   <input
                     type="text"
-                    defaultValue="User Name"
+                    name="name"
+                    value={form.name}
+                    onChange={handleChange}
                     style={{
                       width: "100%",
                       borderRadius: "8px",
@@ -122,7 +234,7 @@ export default function Profile() {
                   </label>
                   <input
                     type="email"
-                    defaultValue="user@example.com"
+                    value={form.email}
                     readOnly
                     style={{
                       width: "100%",
@@ -134,9 +246,6 @@ export default function Profile() {
                       fontSize: "14px",
                     }}
                   />
-                  <p style={{ fontSize: "12px", color: "#9ca3af", marginTop: "4px" }}>
-                    * เปลี่ยนอีเมลควรทำผ่านการยืนยันตัวตน
-                  </p>
                 </div>
 
                 <div>
@@ -145,7 +254,9 @@ export default function Profile() {
                   </label>
                   <input
                     type="tel"
-                    defaultValue="081-234-5678"
+                    name="phone"
+                    value={form.phone}
+                    onChange={handleChange}
                     style={{
                       width: "100%",
                       borderRadius: "8px",
@@ -158,7 +269,15 @@ export default function Profile() {
                 </div>
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "24px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginTop: "24px",
+                }}
+              >
+                <span style={{ fontSize: "14px" }}>{message}</span>
                 <button
                   type="submit"
                   style={{

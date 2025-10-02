@@ -3,18 +3,16 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 
-const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
+const API = process.env.REACT_APP_API_URL || "https://badminton-mongo.onrender.com";
 
-/** พาเลตให้ใกล้เคียงแบบตัวอย่าง */
 const colors = {
-  bg: "#ffffff",         // พื้นหลังเพจขาว
-  card: "#e5e7eb",       // การ์ดเทาอ่อน (คล้ายในรูป)
-  input: "#d1d5db",      // ช่องกรอกเทาเข้มขึ้น
+  primary: "#10B981",
+  primaryDark: "#059669",
   ink: "#0f172a",
-  muted: "#6b7280",
+  muted: "#64748b",
   line: "#e5e7eb",
-  green: "#2e7d32",      // ปุ่มเขียวหลัก
-  greenHover: "#1b5e20", // hover
+  card: "#ffffff",
+  bg: "#f8fafc",
 };
 
 export default function Register() {
@@ -36,7 +34,13 @@ export default function Register() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
+
+      // 🟢 Debug log
+      console.log("📌 API URL:", `${API}/api/auth/register`);
+      console.log("📌 Response status:", res.status);
+
       const data = await res.json().catch(() => ({}));
+      console.log("📌 Response body:", data);
 
       if (res.ok) {
         setMessage("✅ สมัครสมาชิกสำเร็จ");
@@ -54,25 +58,20 @@ export default function Register() {
 
   return (
     <div style={ui.page}>
-      {/* โลโก้จาก public/image/logo.png */}
-      <div style={ui.logoWrap}>
-        <img src="/image/logo.png" alt="Badminton Logo" style={ui.logo} />
-        <div style={ui.brandText}>BADMINTON</div>
-      </div>
-
       <div style={ui.card}>
-        <h1 style={ui.title}>Register</h1>
+        <h1 style={ui.title}>สมัครสมาชิก</h1>
+        <p style={ui.sub}>สร้างบัญชีเพื่อเริ่มจองสนาม</p>
 
-        <form onSubmit={handleSubmit} style={{ marginTop: 14 }}>
-          {/* Username */}
+        <form onSubmit={handleSubmit} style={{ marginTop: 20 }}>
+          {/* Name */}
           <div style={ui.field}>
-            <label htmlFor="name" style={ui.label}>Username</label>
+            <label htmlFor="name" style={ui.label}>ชื่อ–สกุล</label>
             <div style={ui.inputWrap}>
               <input
                 id="name"
                 type="text"
                 name="name"
-                placeholder=""
+                placeholder="สมหมาย หมายปอง"
                 value={form.name}
                 onChange={handleChange}
                 required
@@ -83,13 +82,13 @@ export default function Register() {
 
           {/* Email */}
           <div style={ui.field}>
-            <label htmlFor="email" style={ui.label}>Email</label>
+            <label htmlFor="email" style={ui.label}>อีเมล</label>
             <div style={ui.inputWrap}>
               <input
                 id="email"
                 type="email"
                 name="email"
-                placeholder=""
+                placeholder="you@example.com"
                 value={form.email}
                 onChange={handleChange}
                 required
@@ -101,13 +100,13 @@ export default function Register() {
 
           {/* Phone */}
           <div style={ui.field}>
-            <label htmlFor="phone" style={ui.label}>Phone number</label>
+            <label htmlFor="phone" style={ui.label}>เบอร์โทร</label>
             <div style={ui.inputWrap}>
               <input
                 id="phone"
                 type="text"
                 name="phone"
-                placeholder=""
+                placeholder="0812345678"
                 value={form.phone}
                 onChange={handleChange}
                 required
@@ -118,13 +117,13 @@ export default function Register() {
 
           {/* Password */}
           <div style={ui.field}>
-            <label htmlFor="password" style={ui.label}>Password</label>
+            <label htmlFor="password" style={ui.label}>รหัสผ่าน</label>
             <div style={ui.inputWrap}>
               <input
                 id="password"
                 type={showPw ? "text" : "password"}
                 name="password"
-                placeholder=""
+                placeholder="อย่างน้อย 6 ตัวอักษร"
                 value={form.password}
                 onChange={handleChange}
                 required
@@ -135,8 +134,6 @@ export default function Register() {
                 type="button"
                 onClick={() => setShowPw(v => !v)}
                 style={ui.eyeBtn}
-                aria-label={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
-                title={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
               >
                 {showPw ? <FiEyeOff /> : <FiEye />}
               </button>
@@ -144,110 +141,87 @@ export default function Register() {
           </div>
 
           <button type="submit" style={{ ...ui.button, opacity: loading ? 0.7 : 1 }} disabled={loading}>
-            {loading ? "กำลังสมัคร..." : "Register"}
+            {loading ? "กำลังสมัคร..." : "สมัครสมาชิก"}
           </button>
         </form>
 
         {message && <p style={ui.message}>{message}</p>}
 
         <p style={ui.helper}>
-          go to <Link to="/login" style={ui.link}>Login</Link>
+          มีบัญชีอยู่แล้ว? <Link to="/login" style={ui.link}>ไปหน้า Login</Link>
         </p>
       </div>
     </div>
   );
 }
 
-/* ===== Styles ===== */
 const ui = {
   page: {
     minHeight: "100vh",
     display: "flex",
-    flexDirection: "column",
+    justifyContent: "center",
     alignItems: "center",
-    gap: 16,
     background: colors.bg,
-    padding: 24,
+    padding: 20,
     fontFamily:
       'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", sans-serif',
     color: colors.ink,
   },
-  logoWrap: { display: "grid", placeItems: "center" },
-  logo: { width: 90, height: 90, objectFit: "contain" },
-  brandText: {
-    marginTop: 6,
-    fontWeight: 800,
-    letterSpacing: 1,
-    fontSize: 14,
-    color: "#0b3b2a",
-  },
-
   card: {
     width: "100%",
     maxWidth: 420,
     background: colors.card,
+    border: `1px solid ${colors.line}`,
     borderRadius: 16,
     boxShadow: "0 10px 30px rgba(2,6,12,0.06)",
-    padding: "26px 28px",
+    padding: "28px 32px",
   },
-  title: {
-    margin: 0,
-    fontSize: 20,
-    fontWeight: 700,
-    textAlign: "center",
-    color: "#111827",
-  },
-
-  field: { marginTop: 14 },
-  label: { display: "block", fontSize: 12, color: colors.ink, marginBottom: 8 },
-
-  // ครอบ input + ปุ่มตาให้อยู่ในกรอบเดียว ไม่ล้ำออกนอก
+  title: { margin: 0, fontSize: 24, fontWeight: 800, color: colors.ink, textAlign: "center" },
+  sub: { margin: "6px 0 0 0", color: colors.muted, fontSize: 14, textAlign: "center" },
+  field: { marginTop: 16 },
+  label: { display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6,textAlign: "left" },
   inputWrap: {
     position: "relative",
     display: "flex",
     alignItems: "center",
-    background: colors.input,
-    borderRadius: 9999,
-    border: "1px solid rgba(0,0,0,0.06)",
+    border: `1px solid ${colors.line}`,
+    borderRadius: 12,
+    background: "#fff",
   },
   input: {
     flex: 1,
-    padding: "10px 44px 10px 16px",
-    background: "transparent",
+    padding: "12px 40px 12px 14px",
     border: "none",
     outline: "none",
     fontSize: 14,
-    borderRadius: 9999,
+    borderRadius: 12,
   },
   eyeBtn: {
     position: "absolute",
     right: 10,
-    width: 28,
-    height: 28,
-    display: "grid",
-    placeItems: "center",
     background: "transparent",
     border: "none",
     cursor: "pointer",
-    color: "#374151",
     fontSize: 18,
+    color: colors.muted,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
-
   button: {
     width: "100%",
-    marginTop: 18,
-    padding: "12px 16px",
-    background: colors.green,
+    marginTop: 20,
+    padding: "12px 14px",
+    background: colors.primary,
     color: "#fff",
     border: "none",
-    borderRadius: 9999,
+    borderRadius: 12,
     cursor: "pointer",
-    fontWeight: 600,
-    fontSize: 16,
-    letterSpacing: 0.2,
+    fontWeight: 700,
+    fontSize: 15,
+    transition: "background 0.2s",
   },
-
   message: { marginTop: 12, textAlign: "center", fontSize: 14 },
-  helper: { marginTop: 10, textAlign: "center", color: colors.muted, fontSize: 12 },
-  link: { color: colors.green, textDecoration: "none", fontWeight: 600 },
+  helper: { marginTop: 16, textAlign: "center", color: colors.muted, fontSize: 14 },
+  link: { color: colors.primaryDark, fontWeight: 700, textDecoration: "none" },
 };

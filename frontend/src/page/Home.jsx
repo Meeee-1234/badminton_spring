@@ -1,4 +1,12 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+
+//56
+const heroImages = [
+  "/image/B1.jpg",
+  "/image/B2.jpg",
+  "/image/B3.jpg",
+];
 
 const images = [
   "/image/B1.jpg",
@@ -11,6 +19,26 @@ const images = [
 ];
 
 export default function Home() {
+    
+    const [user, setUser] = useState(null);
+    const [current, setCurrent] = useState(0); //56
+
+    useEffect(() => {
+        // ดึงข้อมูล user จาก localStorage
+        const savedUser = localStorage.getItem("auth:user");
+        if (savedUser) {
+        try {
+            setUser(JSON.parse(savedUser));
+        } catch {
+            setUser(null);
+        }
+        }
+    }, []);
+
+      // Simple slider next/prev 56
+  const nextSlide = () => setCurrent((prev) => (prev + 1) % heroImages.length);
+  const prevSlide = () =>
+    setCurrent((prev) => (prev - 1 + heroImages.length) % heroImages.length);
 
   return (
     <div style={{ background: "#f3f4f6", minHeight: "100vh" }}>
@@ -18,27 +46,135 @@ export default function Home() {
         <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", }} >
 
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <img src="/image/logo.png" alt="Logo"
-                style={{ width: "100px", borderRadius: "8px" }}/>
+                <img src="/image/logo.png" alt="Logo" style={{ width: "100px", borderRadius: "8px" }}/>
             </div>
 
             <nav style={{ display: "flex", gap: "20px", alignItems: "center" }}>
-                <Link to="/register"
-                    style={{ padding: "10px 20px", borderRadius: "8px", background: "#10b981", color: "white", fontWeight: "600", textDecoration: "none", transition: "0.3s", boxShadow: "0 4px 8px rgba(16,185,129,0.3)", }}
-                        onMouseOver={(e) => (e.target.style.background = "#059669")}
-                        onMouseOut={(e) => (e.target.style.background = "#10b981")}>
-                    Register
-                </Link>
-            </nav>
-
+                {user ? (
+                    <Link to="/profile"
+                        style={{ padding: "10px 20px", borderRadius: "8px", background: "#10b981", color: "white", fontWeight: "600",
+                                textDecoration: "none", transition: "0.3s", boxShadow: "0 4px 8px rgba(16,185,129,0.3)", }}
+                        onMouseOver={(e) => (e.target.style.background = "#059669") }
+                        onMouseOut={(e) => (e.target.style.background = "#10b981") } >
+                        {user.name || user.email} {/* แสดงชื่อ หรือถ้าไม่มีใช้ email */}
+                    </Link>
+                    ) : (
+                    <Link to="/login" 
+                        style={{ padding: "10px 20px", borderRadius: "8px", background: "#10b981", color: "white", fontWeight: "600", 
+                                textDecoration: "none", transition: "0.3s", boxShadow: "0 4px 8px rgba(16,185,129,0.3)", }}
+                        onMouseOver={(e) => (e.target.style.background = "#059669") }
+                        onMouseOut={(e) => (e.target.style.background = "#10b981") }>
+                        Login
+                    </Link>
+                )}
+            </nav> 
         </div>
     </header>
 
-    <main className="container" style={{ maxWidth: "1200px", margin: "40px auto", padding: "0 20px" }}><br/>
+    {/* Hero Section 56 */}
+      <section style={{
+          position: "relative",
+          width: "100%",
+          height: "80vh",
+          overflow: "hidden",
+        }}
+      >
+        <img
+          src={heroImages[current]}
+          alt="Hero"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            filter: "brightness(0.6)",
+            transition: "0.5s",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            color: "white",
+            textAlign: "center",
+          }}
+        >
+          <p style={{ fontSize: "1.2rem", marginBottom: "10px" }}>
+            สนามมาตรฐาน ตีมันส์ทุกแมตช์
+          </p>
+          <h1
+            style={{
+              fontSize: "4rem",
+              fontWeight: "800",
+              marginBottom: "20px",
+              textShadow: "2px 2px 8px rgba(0,0,0,0.5)",
+            }}
+          >
+            Game On
+          </h1>
+          <Link
+            to="/details"
+            style={{
+              padding: "12px 30px",
+              background: "#10b981",
+              color: "white",
+              borderRadius: "8px",
+              fontWeight: "600",
+              textDecoration: "none",
+              transition: "0.3s",
+            }}
+            onMouseOver={(e) => (e.target.style.background = "#059669")}
+            onMouseOut={(e) => (e.target.style.background = "#10b981")}
+          >
+            จองคอร์ต →
+          </Link>
+        </div>
 
-        <section>
-            
-        </section>
+        {/* Slider Controls 56 */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: "20px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            display: "flex",
+            gap: "10px",
+          }}
+        >
+          <button
+            onClick={prevSlide}
+            style={{
+              background: "rgba(0,0,0,0.5)",
+              color: "white",
+              border: "none",
+              borderRadius: "50%",
+              width: "40px",
+              height: "40px",
+              cursor: "pointer",
+            }}
+          >
+            ‹
+          </button>
+          <button
+            onClick={nextSlide}
+            style={{
+              background: "rgba(0,0,0,0.5)",
+              color: "white",
+              border: "none",
+              borderRadius: "50%",
+              width: "40px",
+              height: "40px",
+              cursor: "pointer",
+            }}
+          >
+            ›
+          </button>
+        </div>
+      </section>
+
+
+    <main className="container" style={{ maxWidth: "1200px", margin: "40px auto", padding: "0 20px" }}><br/>
 
         <section style={{ marginTop: "60px", background: "#ffffff", borderRadius: "16px",padding: "30px", 
                           marginBottom: "40px", boxShadow: "0 6px 16px rgba(0,0,0,0.08)",}} >
@@ -121,7 +257,7 @@ export default function Home() {
                 <iframe src="https://www.google.com/maps/embed?pb=!1m18..." width="100%" height="250"
                         style={{ border: 0, borderRadius: "12px", boxShadow: "0 4px 10px rgba(0,0,0,0.1)" }} title="map">
                 </iframe>
-            </div><br/>
+            </div><br/><br/>
         </section>
     </main>
 
