@@ -110,6 +110,13 @@ function isAdmin(req, res, next) {
 app.get("/api/admin/users", isAdmin, async (req, res) => {
   try {
     const users = await User.find({ isDeleted: { $ne: true } }).select("-password");
+
+    const formatted = users.map((u) => ({
+      ...u.toObject(),
+      createdAt: new Date(u.createdAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }),
+      updatedAt: new Date(u.updatedAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }),
+    }));
+
     res.json({ users });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch users" });
@@ -126,7 +133,10 @@ app.get("/api/admin/bookings", isAdmin, async (req, res) => {
       date: b.date,
       court: b.court,
       hour: b.hour,
-      status: "booked"
+      // status: "booked"
+      status: b.status,
+      createdAt: new Date(b.createdAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }),
+      updatedAt: new Date(b.updatedAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })
     }));
     res.json({ bookings: formatted });
   } catch (err) {
@@ -410,12 +420,53 @@ app.get("/api/profile/:userId", async (req, res) => {
       return res.status(404).json({ error: "ไม่พบโปรไฟล์" });
     }
 
+    const formatted = {
+      ...profile.toObject(),
+      createdAt: new Date(profile.createdAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }),
+      updatedAt: new Date(profile.updatedAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }),
+    };
+
     res.json(profile);
   } catch (err) {
     console.error("❌ Profile get error:", err.message);
     res.status(500).json({ error: "Server error" });
   }
 });
+
+
+// ✅ Update booking status (Admin only)
+app.patch("/api/admin/bookings/:id/status", isAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!["booked", "arrived", "canceled"].includes(status)) {
+      return res.status(400).json({ error: "สถานะไม่ถูกต้อง" });
+    }
+
+    const booking = await Booking.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true }
+    ).populate("user", "name email");
+
+    if (!booking) {
+      return res.status(404).json({ error: "ไม่พบการจอง" });
+    }
+
+    res.json({ message: "อัพเดตสถานะเรียบร้อย", booking });
+  } catch (err) {
+    console.error("❌ Update booking status error:", err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+
+
+
+
+
+
 
 
 

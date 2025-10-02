@@ -9,12 +9,13 @@ export default function Profile() {
   const [editForm, setEditForm] = useState({ name: "", email: "", phone: "" });
   const [message, setMessage] = useState("");
   const [userId, setUserId] = useState(null);
+    const [emergencyMessage, setEmergencyMessage] = useState("");
 
   const [emergencyForm, setEmergencyForm] = useState({
     emergencyName: "",
     emergencyPhone: "",
   });
-  const [emergencyMessage, setEmergencyMessage] = useState("");
+
 
   // โหลดข้อมูล user จาก localStorage
   useEffect(() => {
