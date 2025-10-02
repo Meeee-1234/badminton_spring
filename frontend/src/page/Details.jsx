@@ -46,20 +46,22 @@ const msUntilNextMidnight = () => {
 
 export default function Details() {
   const navigate = useNavigate();
+
   // 🔒 วัน “วันนี้” อัตโนมัติ
   const [dateKey, setDateKey] = useState(() => toDateKey());
-  const [taken, setTaken] = useState([]);
-  const [mine, setMine]   = useState([]);
-  const [selected, setSelected] = useState([]);
+  const [taken, setTaken] = useState([]);       // ["1:9","2:10"]
+  const [mine, setMine]   = useState([]);       // ["1:9","2:10"] ของผู้ใช้
+  const [selected, setSelected] = useState([]); // [{court, hour}]
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
+
   // ✅ สเกลอัตโนมัติให้ “พอดีจอ”
   const [scale, setScale] = useState(1);
   const viewportRef = useRef(null);
   const contentRef = useRef(null);
 
-  /** ===== SCALE TO FIT ===== */
+  // คำนวณ scale เมื่อโหลด/เปลี่ยนขนาดหน้าต่าง/เนื้อหา
   useLayoutEffect(() => {
     const calc = () => {
       const ct = contentRef.current;
@@ -102,7 +104,7 @@ export default function Details() {
     };
   }, []);
 
-  /** ===== AUTO DATE UPDATE ===== */
+  // อัปเดตเป็นวันใหม่อัตโนมัติเที่ยงคืน
   useEffect(() => {
     const tick = () => {
       const today = toDateKey();
@@ -123,7 +125,7 @@ export default function Details() {
     };
   }, []);
 
-  /** ===== LOAD BOOKINGS ===== */
+  // โหลดสถานะจอง (รวม “ของฉัน”)
   useEffect(() => {
     let cancelled = false;
 
@@ -143,7 +145,7 @@ export default function Details() {
             const mJson = await mRes.json();
             if (!cancelled) setMine(mJson.mine || []);
           } catch {
-            if (!cancelled) setMine([]);
+            if (!cancelled) setMine([]); // fallback ถ้ายังไม่มี endpoint
           }
         } else {
           if (!cancelled) setMine([]);
@@ -163,7 +165,7 @@ export default function Details() {
   const isSelected = (c, h) => selected.some((s) => s.court === c && s.hour === h);
 
   const toggleCell = (c, h) => {
-    if (isTaken(c, h) && !isMine(c, h)) return;
+    if (isTaken(c, h)) return; // ช่องจองแล้วคลิกไม่ได้
     setSelected((prev) =>
       prev.some((s) => s.court === c && s.hour === h)
         ? prev.filter((s) => !(s.court === c && s.hour === h))
@@ -171,7 +173,6 @@ export default function Details() {
     );
   };
 
-  /** ===== CONFIRM BOOKING ===== */
   const handleConfirm = async () => {
     setLoading(true);
     setMsg("");
@@ -182,8 +183,6 @@ export default function Details() {
         setLoading(false);
         return;
       }
-
-      // POST booking
       for (const s of selected) {
         const res = await fetch(ENDPOINTS.create, {
           method: "POST",
@@ -203,23 +202,28 @@ export default function Details() {
           return;
         }
       }
-
-      // อัปเดต state ของเราเองทันที โดยไม่ต้องรอ API
-      const newMine = [...mine];
-      selected.forEach((s) => {
-        const key = `${s.court}:${s.hour}`;
-        if (!newMine.includes(key)) newMine.push(key);
-      });
-      setMine(newMine);
-
-      // อัปเดต taken (รวมของคนอื่น)
-      const tRes = await fetch(ENDPOINTS.taken(dateKey));
-      const tJson = await tRes.json();
-      setTaken(tJson.taken || []);
-
       setMsg("✅ จองสำเร็จ!");
       setSelected([]);
       setNote("");
+
+      // reload ตาราง + mine
+      const [tRes, mRes] = await Promise.all([
+        fetch(ENDPOINTS.taken(dateKey)),
+        (async () => {
+          const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
+          if (!user?._id) return null;
+          try {
+            const r = await fetch(ENDPOINTS.mine(dateKey, user._id));
+            return r.ok ? r : null;
+          } catch { return null; }
+        })(),
+      ]);
+      const tJson = await tRes.json();
+      setTaken(tJson.taken || []);
+      if (mRes) {
+        const mJson = await mRes.json();
+        setMine(mJson.mine || []);
+      }
     } catch (err) {
       console.error("Booking error:", err);
       setMsg("❌ Server error");
@@ -228,15 +232,20 @@ export default function Details() {
     }
   };
 
+  
+
+  
+
   const goHome = () => {
     try { navigate("/"); } catch { window.location.href = "/"; }
   };
 
   return (
     <div ref={viewportRef} style={ui.page}>
+      {/* ✅ ตัวคอนเทนต์จริง — จะถูกสเกลให้พอดีจออัตโนมัติ */}
       <div ref={contentRef} style={ui.contentWrap}>
         <div style={ui.container}>
-          {/* LEFT: ตาราง */}
+          {/* ซ้าย: ตาราง */}
           <section style={ui.left}>
             <div style={ui.toolbar}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -258,7 +267,7 @@ export default function Details() {
                 </div>
               </div>
 
-              {/* Legend */}
+              {/* Legend สถานะ */}
               <div style={ui.legendWrap} aria-hidden>
                 <span style={ui.legendItem}><span style={ui.dotMine} /> ของฉัน</span>
                 <span style={ui.legendItem}><span style={ui.dotPicked} /> เลือกแล้ว</span>
@@ -267,7 +276,7 @@ export default function Details() {
               </div>
             </div>
 
-            {/* ตาราง */}
+            {/* ตารางคอร์ต x ชั่วโมง */}
             <div style={ui.tableFrame}>
               <div style={ui.headerRow}>
                 <div style={{ ...ui.headerCell, width: 140, textAlign: "left" }}>ช่วงเวลา</div>
@@ -285,21 +294,12 @@ export default function Details() {
                       const mineCell  = isMine(c, h);
                       const picked    = isSelected(c, h);
 
-                      // ===== แก้ไข priority ของ mineCell =====
-                      let label = "ว่าง";
-                      let styleForCell = ui.cellFree;
+                      const label = takenCell ? (mineCell ? "ของฉัน" : "เต็ม") : (picked ? "เลือกแล้ว" : "ว่าง");
+                      const styleForCell =
+                        takenCell ? (mineCell ? ui.cellMine : ui.cellTaken)
+                                  : (picked ? ui.cellPicked : ui.cellFree);
 
-                      if (mineCell) {
-                        label = "ของฉัน";
-                        styleForCell = ui.cellMine;
-                      } else if (takenCell) {
-                        label = "เต็ม";
-                        styleForCell = ui.cellTaken;
-                      } else if (picked) {
-                        label = "เลือกแล้ว";
-                        styleForCell = ui.cellPicked;
-                      }
-
+                      // ✅ ของฉัน: ไม่ใช้ disabled จริง เพื่อไม่ให้ซีด แต่กันกดด้วย pointerEvents
                       const commonBtnStyle = { ...ui.cellBtn, ...styleForCell };
                       const btnProps = mineCell
                         ? { disabled: false, "aria-disabled": true, style: { ...commonBtnStyle, ...ui.mineNoDim } }
@@ -323,7 +323,7 @@ export default function Details() {
             </div>
           </section>
 
-          {/* RIGHT: สรุป */}
+          {/* ขวา: สรุปการจอง */}
           <aside style={ui.right}>
             <div style={ui.card}>
               <h2 style={ui.cardTitle}>สรุปการจอง</h2>
@@ -390,7 +390,7 @@ export default function Details() {
   );
 }
 
-/** ===== UI ===== */
+/** ===== UI (ออกแบบให้สวย แล้วสเกลทั้งบล็อกให้พอดีจอ) ===== */
 const ui = {
   page: {
     minHeight: "100vh",
@@ -401,84 +401,251 @@ const ui = {
     padding: 8,
     overflow: "hidden",
   },
+
   contentWrap: {
     transform: "scale(1)",
     transformOrigin: "top left",
     width: "auto",
   },
+
   container: {
     width: 1200,
     margin: "0 auto",
-    display: "flex",
-    gap: 24,
-    padding: "12px 0",
+    display: "grid",
+    gridTemplateColumns: "1fr 340px",
+    gap: 16,
   },
-  left: { flex: 1 },
-  right: { width: 320, flexShrink: 0 },
-  toolbar: { display: "flex", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 12 },
+
+  /* Left */
+  left: { minWidth: 0 },
+  toolbar: {
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 10,
+    flexWrap: "wrap",
+  },
   backBtn: {
-    background: colors.primary,
-    color: "#fff",
-    border: "none",
-    padding: "6px 12px",
-    borderRadius: 6,
+    padding: "8px 12px",
+    borderRadius: 10,
+    border: `1px solid ${colors.lineStrong}`,
+    background: "#fff",
     cursor: "pointer",
+    fontWeight: 700,
   },
-  dateInput: { padding: 6, border: `1px solid ${colors.line}`, borderRadius: 6 },
-  labelSm: { fontSize: 12, fontWeight: 500 },
-  badgeNote: { fontSize: 11, color: colors.muted },
-  legendWrap: { display: "flex", gap: 10, marginTop: 6, flexWrap: "wrap" },
-  legendItem: { fontSize: 12, display: "flex", alignItems: "center", gap: 4 },
-  dotMine: { display: "inline-block", width: 12, height: 12, borderRadius: 3, background: colors.primaryDark },
-  dotPicked: { display: "inline-block", width: 12, height: 12, borderRadius: 3, background: colors.primary },
-  dotFree: { display: "inline-block", width: 12, height: 12, borderRadius: 3, background: "#fff", border: `1px solid ${colors.line}` },
-  dotTaken: { display: "inline-block", width: 12, height: 12, borderRadius: 3, background: colors.taken },
-  tableFrame: { border: `1px solid ${colors.lineStrong}`, borderRadius: 6, overflow: "hidden" },
-  headerRow: { display: "flex", background: colors.lineStrong },
-  headerCell: { flex: 1, padding: "6px 4px", fontWeight: 600, textAlign: "center", borderRight: `1px solid ${colors.line}` },
-  bodyGrid: { display: "flex", flexDirection: "column" },
-  row: { display: "flex" },
-  rowAlt: { background: colors.primarySoft },
-  timeCell: { width: 140, padding: 6, borderRight: `1px solid ${colors.line}` },
-  cellBtn: {
-    flex: 1,
-    padding: 6,
-    border: "none",
-    cursor: "pointer",
-    minHeight: 32,
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  cellFree: { background: "#fff", border: `1px solid ${colors.line}` },
-  cellTaken: { background: colors.taken, border: `1px solid ${colors.line}`, cursor: "not-allowed" },
-  cellMine: { background: colors.primaryDark, color: "#fff" },
-  cellPicked: { background: colors.primary, color: "#fff" },
-  mineNoDim: { pointerEvents: "none" },
-  statusPill: (takenCell, picked, mineCell) => ({
-    padding: "2px 6px",
-    borderRadius: 4,
+  labelSm: { display: "block", fontSize: 13, fontWeight: 700, marginBottom: 6, color: colors.muted },
+  badgeNote: {
+    display: "inline-block",
     fontSize: 12,
-    fontWeight: 500,
-    color: mineCell || picked ? "#fff" : takenCell ? colors.muted : colors.ink,
-  }),
-  card: { background: colors.card, borderRadius: 6, padding: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.08)" },
-  cardTitle: { fontWeight: 600, marginBottom: 6 },
-  summaryRow: { display: "flex", justifyContent: "space-between", marginBottom: 4 },
-  textarea: { width: "100%", padding: 6, border: `1px solid ${colors.line}`, borderRadius: 6 },
-  confirmBtn: {
-    marginTop: 12,
-    width: "100%",
-    padding: 8,
+    padding: "6px 10px",
+    borderRadius: 999,
+    background: colors.primarySoft,
+    color: colors.primaryDark,
+    border: `1px solid ${colors.primary}`,
+    width: "fit-content",
+  },
+  dateInput: {
+    padding: "10px 12px",
+    border: `1px solid ${colors.line}`,
+    borderRadius: 10,
+    background: "#fff",
+    fontSize: 14,
+    outline: "none",
+  },
+
+  /* Legend */
+  legendWrap: {
+    display: "flex",
+    alignItems: "center",
+    gap: 14,
+    background: "#fff",
+    padding: "8px 12px",
+    borderRadius: 999,
+    border: `1px solid ${colors.line}`,
+    boxShadow: "0 4px 18px rgba(2,6,12,.05)",
+    whiteSpace: "nowrap",
+  },
+  legendItem: { display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: colors.muted },
+  dotFree:  { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: "#fff", border: `1px solid ${colors.lineStrong}` },
+  dotPicked:{ display: "inline-block", width: 12, height: 12, borderRadius: 999, background: colors.primary, border: `1px solid ${colors.primaryDark}` },
+  dotTaken: { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: colors.taken, border: `1px solid ${colors.lineStrong}` },
+  dotMine:  { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: "#dcfce7", border: `1px solid ${colors.success}` },
+
+  /* กรอบตาราง */
+  tableFrame: {
+    background: colors.card,
+    border: `1px solid ${colors.lineStrong}`,
+    borderRadius: 16,
+    boxShadow: "0 12px 30px rgba(2,6,12,0.06)",
+    overflow: "hidden",
+  },
+  headerRow: {
+    display: "grid",
+    gridTemplateColumns: `140px repeat(${COURTS.length}, 1fr)`,
+    borderBottom: `1px solid ${colors.lineStrong}`,
+    background: colors.primarySoft,
+    boxShadow: "inset 0 -1px 0 " + colors.lineStrong,
+  },
+  headerCell: {
+    padding: "12px 10px",
+    fontSize: 13,
+    fontWeight: 900,
+    textAlign: "center",
+    borderLeft: `1px solid ${colors.lineStrong}`,
+    color: colors.primaryDark,
+    letterSpacing: 0.2,
+  },
+
+  bodyGrid: {
+    display: "grid",
+    gridAutoFlow: "row",
+  },
+  row: {
+    display: "grid",
+    gridTemplateColumns: `140px repeat(${COURTS.length}, 1fr)`,
+    borderTop: `1px solid ${colors.line}`,
+  },
+  rowAlt: { background: "#fbfdfc" },
+  timeCell: {
+    padding: "12px 10px",
+    fontSize: 13,
+    textAlign: "left",
+    background: "#ffffff",
+    borderRight: `1px solid ${colors.lineStrong}`,
+    fontWeight: 700,
+  },
+
+  cellBtn: {
+    padding: "14px 8px",
+    fontSize: 13,
+    background: "#fff",
     border: "none",
-    borderRadius: 6,
+    borderLeft: `1px solid ${colors.line}`,
+    cursor: "pointer",
+    transition: "transform .06s ease, box-shadow .12s ease, background .12s ease",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    outline: "none",
+  },
+  cellFree:   { background: "#fff" },
+  cellPicked: {
+    background: colors.primarySoft,
+    boxShadow: "inset 0 0 0 2px " + colors.primary,
+  },
+  cellTaken:  {
+    background: colors.taken,
+    color: "#9ca3af",
+    cursor: "not-allowed",
+  },
+  // ✅ สีเขียวสำหรับ “ของฉัน”
+  cellMine: {
+    background: "#bbf7d0", // เขียวสด (tailwind: green-300)
+    boxShadow: `inset 0 0 0 2px ${colors.success}`,
+    color: "#065f46",
+    fontWeight: 700,
+    cursor: "not-allowed",
+  },
+  // ป้องกันปุ่มซีด/หรี่เวลาเป็นของฉัน (ไม่ใช้ disabled จริง แต่ให้กดไม่ติด)
+  mineNoDim: {
+    pointerEvents: "none",
+    cursor: "not-allowed",
+    opacity: 1,
+    filter: "none",
+  },
+
+  statusPill: (isTaken, isPicked, isMine) => ({
+    fontSize: 12,
+    fontWeight: 800,
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: `1px solid ${
+      isMine ? colors.success
+      : isTaken ? colors.lineStrong
+      : isPicked ? colors.primaryDark
+      : colors.lineStrong
+    }`,
+    background: isMine
+      ? "#22c55e" // เขียวชัด (tailwind: green-400)
+      : (isTaken
+          ? "#f1f5f9"
+          : isPicked
+            ? "#dcfce7"
+            : "#ffffff"),
+    color: isMine ? "#fff" : (isTaken ? "#94a3b8" : isPicked ? colors.success : colors.ink),
+    letterSpacing: 0.2,
+  }),
+
+  /* Right */
+  right: { minWidth: 0 },
+  card: {
+    background: colors.card,
+    border: `1px solid ${colors.line}`,
+    borderRadius: 16,
+    boxShadow: "0 12px 30px rgba(2,6,12,0.06)",
+    padding: 14,
+    position: "sticky",
+    top: 0,
+  },
+  cardTitle: { margin: 0, fontSize: 18, fontWeight: 900, color: colors.primaryDark },
+  summaryRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    fontSize: 14,
+    marginTop: 10,
+  },
+  textarea: {
+    width: "100%",
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: `1px solid ${colors.line}`,
+    outline: "none",
+    fontSize: 14,
+    lineHeight: "1.5",
+    background: "#fff",
+    resize: "vertical",
+    boxSizing: "border-box",
+  },
+  confirmBtn: {
+    width: "100%",
+    marginTop: 12,
+    padding: "12px 14px",
     background: colors.primaryDark,
     color: "#fff",
-    fontWeight: 600,
+    border: "none",
+    borderRadius: 12,
+    cursor: "pointer",
+    fontWeight: 800,
+    fontSize: 15,
+  },
+  selectedList: {
+    marginTop: 8,
+    listStyle: "none",
+    padding: 0,
+    borderTop: `1px solid ${colors.line}`,
+  },
+  selectedItem: {
+    display: "grid",
+    gridTemplateColumns: "auto 1fr auto",
+    gap: 8,
+    alignItems: "center",
+    padding: "8px 0",
+    fontSize: 13,
+    borderBottom: `1px dashed ${colors.line}`,
+  },
+  removeBtn: {
+    background: "transparent",
+    border: `1px solid ${colors.line}`,
+    borderRadius: 8,
+    padding: "2px 8px",
     cursor: "pointer",
   },
-  selectedList: { marginTop: 6, padding: 0, listStyle: "none", fontSize: 13 },
-  selectedItem: { display: "flex", justifyContent: "space-between", padding: "4px 0" },
-  removeBtn: { border: "none", background: "transparent", color: colors.danger, cursor: "pointer" },
-  message: { marginTop: 8, fontSize: 13 },
+  message: {
+    marginTop: 10,
+    fontSize: 14,
+    textAlign: "center",
+    color: colors.accent,
+  },
 };
