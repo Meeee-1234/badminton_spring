@@ -5,37 +5,43 @@ const API = "https://badminton-hzwm.onrender.com";
 
 export default function Profile() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: "", email: "", phone: "" });
+  const [user, setUser] = useState({ name: "", email: "", phone: "" }); // เก็บค่าจริง
+  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "" }); // สำหรับแก้ไข
   const [message, setMessage] = useState("");
   const [userId, setUserId] = useState(null);
 
   // โหลดข้อมูล user จาก localStorage
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
-    if (user?._id) {
-      setUserId(user._id); // ✅ ใช้ _id
-      setForm({ name: user.name, email: user.email, phone: user.phone });
+    const u = JSON.parse(localStorage.getItem("auth:user") || "{}");
+    if (u?._id) {
+      setUserId(u._id);
+      setUser({ name: u.name, email: u.email, phone: u.phone });
+      setEditForm({ name: u.name, email: u.email, phone: u.phone });
     }
   }, []);
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    setEditForm({ ...editForm, [e.target.name]: e.target.value });
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
     setMessage("⏳ กำลังบันทึก...");
+
     try {
       const res = await fetch(`${API}/api/users/${userId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name, phone: form.phone }),
+        body: JSON.stringify({
+          name: editForm.name,
+          phone: editForm.phone,
+        }),
       });
 
       const data = await res.json();
       if (res.ok) {
         setMessage("✅ อัพเดตข้อมูลสำเร็จ");
-        // ✅ เก็บ user ใหม่ลง localStorage
+        setUser({ ...user, name: data.user.name, phone: data.user.phone }); // sync user จริง
         localStorage.setItem("auth:user", JSON.stringify(data.user));
       } else {
         setMessage(`❌ ${data.error || "อัพเดตไม่สำเร็จ"}`);
@@ -132,13 +138,13 @@ export default function Profile() {
                     fontSize: "18px",
                   }}
                 >
-                  {form.name?.[0] || "U"}
+                  {user.name?.[0] || "U"}
                 </div>
                 <div>
                   <div style={{ fontSize: "20px", fontWeight: "700", color: "#111827" }}>
-                    {form.name}
+                    {user.name}
                   </div>
-                  <div style={{ fontSize: "14px", color: "#6b7280" }}>{form.email}</div>
+                  <div style={{ fontSize: "14px", color: "#6b7280" }}>{user.email}</div>
                 </div>
               </div>
 
@@ -157,7 +163,7 @@ export default function Profile() {
                   }}
                 >
                   <span style={{ color: "#6b7280" }}>Phone</span>
-                  <span style={{ fontWeight: "500", color: "#111827" }}>{form.phone}</span>
+                  <span style={{ fontWeight: "500", color: "#111827" }}>{user.phone}</span>
                 </div>
               </div>
 
@@ -215,7 +221,7 @@ export default function Profile() {
                   <input
                     type="text"
                     name="name"
-                    value={form.name}
+                    value={editForm.name}
                     onChange={handleChange}
                     style={{
                       width: "100%",
@@ -234,7 +240,7 @@ export default function Profile() {
                   </label>
                   <input
                     type="email"
-                    value={form.email}
+                    value={editForm.email}
                     readOnly
                     style={{
                       width: "100%",
@@ -255,7 +261,7 @@ export default function Profile() {
                   <input
                     type="tel"
                     name="phone"
-                    value={form.phone}
+                    value={editForm.phone}
                     onChange={handleChange}
                     style={{
                       width: "100%",
