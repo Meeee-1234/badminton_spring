@@ -97,28 +97,62 @@ export default function Details() {
     };
   }, []);
 
-// ✅ อัปเดตเป็นวันใหม่อัตโนมัติ
+// ✅ อัปเดตเป็นวันใหม่อัตโนมัติ (ทำงานทุกเที่ยงคืน)
 useEffect(() => {
-  const updateDate = () => {
-    const today = toDateKey();
-    setDateKey((prev) => {
-      if (prev !== today) {
-        // รีเซ็ตสถานะเมื่อเข้าสู่วันใหม่
-        setTaken([]);
-        setMine([]);
-        setSelected([]);
-        return today;
-      }
-      return prev;
-    });
-  };
+  const updateDate = () => setDateKey(toDateKey());
 
-  updateDate(); // run ครั้งแรก
-  const interval = setInterval(updateDate, 60 * 1000); // เช็กทุกนาที
+  // ตั้งค่า dateKey ทันทีตอน component mount
+  updateDate();
 
-  return () => clearInterval(interval);
+  // หาว่ากี่ ms ถึงเที่ยงคืน
+  const now = new Date();
+  const nextMidnight = new Date(now);
+  nextMidnight.setDate(now.getDate() + 1);
+  nextMidnight.setHours(0, 0, 0, 0);
+  const msToMidnight = nextMidnight.getTime() - now.getTime();
+
+  // รอจนถึงเที่ยงคืน แล้วค่อยตั้ง interval 24 ชม.
+  const midnightTimeout = setTimeout(() => {
+    updateDate();
+    const daily = setInterval(updateDate, 24 * 60 * 60 * 1000);
+    // cleanup interval
+    return () => clearInterval(daily);
+  }, msToMidnight);
+
+  return () => clearTimeout(midnightTimeout);
 }, []);
 
+// ✅ รีเซ็ตตารางเมื่อ dateKey เปลี่ยน
+useEffect(() => {
+  setTaken([]);
+  setMine([]);
+  setSelected([]);
+  setNote("");
+
+  // 🔄 โหลดข้อมูลใหม่ของวันนั้นเสมอ
+  const load = async () => {
+    try {
+      const [tRes, user] = await Promise.all([
+        fetch(ENDPOINTS.taken(dateKey)),
+        Promise.resolve(JSON.parse(localStorage.getItem("auth:user") || "{}")),
+      ]);
+      const tJson = await tRes.json();
+      setTaken(tJson.taken || []);
+
+      if (user?._id) {
+        const mRes = await fetch(ENDPOINTS.mine(dateKey, user._id));
+        if (mRes.ok) {
+          const mJson = await mRes.json();
+          setMine(mJson.mine || []);
+        }
+      }
+    } catch (err) {
+      console.error("Load bookings error:", err);
+    }
+  };
+
+  if (dateKey) load();
+}, [dateKey]);
 
 
   // โหลดสถานะจอง (รวม “ของฉัน”)

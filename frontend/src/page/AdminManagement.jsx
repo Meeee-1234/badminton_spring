@@ -107,29 +107,30 @@ export default function AdminManagement() {
       <button
         onClick={() => navigate("/")}
         style={{
-    padding: "8px 16px",
-    borderRadius: 12,
-    border: "1px solid #d1d5db",
-    background: "#fff",
-    color: "#0f172a",
-    fontWeight: 600,
-    cursor: "pointer",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    transition: "background 0.2s, border-color 0.2s",
-  }}
-  onMouseEnter={(e) => {
-    e.currentTarget.style.background = "#f9fafb";
-    e.currentTarget.style.borderColor = "#10b981";
-  }}
-  onMouseLeave={(e) => {
-    e.currentTarget.style.background = "#fff";
-    e.currentTarget.style.borderColor = "#d1d5db";
-  }}
->
-  ← กลับหน้าแรก
-</button>
+        padding: "8px 16px",
+        borderRadius: 12,
+        border: "1px solid #d1d5db",
+        background: "#fff",
+        color: "#0f172a",
+        fontWeight: 600,
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        transition: "background 0.2s, border-color 0.2s",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "#f9fafb";
+        e.currentTarget.style.borderColor = "#10b981";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "#fff";
+        e.currentTarget.style.borderColor = "#d1d5db";
+      }}
+    >
+      ← กลับหน้าแรก
+    </button>
+    
         <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 20, textAlign: "center" }}>
           📊 Admin Management
         </h1>
