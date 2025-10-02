@@ -59,6 +59,11 @@ const bookingSchema = new mongoose.Schema(
     date: { type: String, required: true }, // YYYY-MM-DD
     court: { type: Number, required: true }, // คอร์ต 1-6
     hour: { type: Number, required: true },  // ชั่วโมง เช่น 9 = 9:00-10:00
+    status: { 
+      type: String, 
+      enum: ["booked", "arrived", "canceled"], 
+      default: "booked"   // เวลาจองใหม่ → สถานะ = จองแล้ว
+    },
   },
   { timestamps: true, collection: "bookings" }
 );
@@ -332,20 +337,28 @@ app.post("/api/bookings", async (req, res) => {
       return res.status(400).json({ error: "ต้องส่ง userId, date, court, hour" });
     }
 
-
     // กันไม่ให้ซ้ำ
     const exists = await Booking.findOne({ date, court, hour });
     if (exists) {
       return res.status(409).json({ error: "ช่วงเวลานี้ถูกจองแล้ว" });
     }
 
-    const booking = await Booking.create({ user: userId, date, court, hour, note });
+    const booking = await Booking.create({ 
+      user: userId, 
+      date, 
+      court, 
+      hour, 
+      note,
+      status: "booked"   // ✅ default เวลาจองใหม่
+    });
+
     res.status(201).json({ message: "จองสำเร็จ", booking });
   } catch (err) {
     console.error("❌ Booking error:", err.message);
     res.status(500).json({ error: "Server error" });
   }
 });
+
 
 // ✅ ดูการจองของ user ตามวัน
 app.get("/api/bookings/my/:userId/:date", async (req, res) => {
