@@ -129,6 +129,26 @@ app.get("/api/admin/bookings", isAdmin, async (req, res) => {
 });
 
 
+app.delete("/api/admin/users/:id", isAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // ✅ เช็คว่า id เป็น ObjectId ถูกต้อง
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "ID ไม่ถูกต้อง" });
+    }
+
+    const user = await User.findByIdAndDelete(id);
+
+    if (!user) return res.status(404).json({ error: "ไม่พบผู้ใช้" });
+
+    res.json({ message: "ลบผู้ใช้เรียบร้อยแล้ว" });
+  } catch (err) {
+    console.error("❌ Delete user error:", err.message);
+    res.status(500).json({ error: "Server error", detail: err.message });
+  }
+});
+
 
 
 

@@ -1,5 +1,5 @@
-
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
 
@@ -8,6 +8,36 @@ export default function AdminManagement() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const navigate = useNavigate();
+
+  // ✅ Logout
+  const handleLogout = () => {
+    localStorage.removeItem("auth:token");
+    localStorage.removeItem("auth:user");
+    navigate("/login");
+  };
+
+  // ✅ Delete User
+const handleDeleteUser = async (id) => {
+  if (!window.confirm("คุณแน่ใจหรือไม่ที่จะลบผู้ใช้นี้?")) return;
+
+  const token = localStorage.getItem("auth:token");
+  try {
+    const res = await fetch(`${API}/api/admin/users/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const data = await res.json();   // ✅ อ่านข้อความจาก backend
+    if (!res.ok) throw new Error(data.error || "ลบผู้ใช้ไม่สำเร็จ");
+
+    setUsers(users.filter((u) => u._id !== id));
+    alert("✅ " + data.message);
+  } catch (err) {
+    console.error(err);
+    alert("❌ " + err.message);
+  }
+};
 
   useEffect(() => {
     const token = localStorage.getItem("auth:token");
@@ -28,16 +58,17 @@ export default function AdminManagement() {
           }),
         ]);
 
-        if (!userRes.ok || !bookingRes.ok) {
-          throw new Error("โหลดข้อมูลไม่สำเร็จ");
-        }
+        if (!userRes.ok || !bookingRes.ok) throw new Error("โหลดข้อมูลไม่สำเร็จ");
 
         const [userData, bookingData] = await Promise.all([
           userRes.json(),
           bookingRes.json(),
         ]);
 
-        setUsers(userData.users || []);
+        // filter user ที่ไม่ใช่ admin
+        const filteredUsers = (userData.users || []).filter((u) => u.role !== "admin");
+
+        setUsers(filteredUsers);
         setBookings(bookingData.bookings || []);
       } catch (err) {
         console.error("โหลดข้อมูลล้มเหลว:", err);
@@ -59,42 +90,30 @@ export default function AdminManagement() {
         minHeight: "100vh",
       }}
     >
-      <h1
-        style={{
-          fontSize: 28,
-          fontWeight: 800,
-          marginBottom: 20,
-          textAlign: "center",
-        }}
-      >
-        📊 Admin Management
-      </h1>
-
-      {/* ✅ แสดงข้อความ error หรือกำลังโหลด */}
-      {loading && <p style={{ textAlign: "center" }}>⏳ กำลังโหลด...</p>}
-      {message && (
-        <div
+      {/* Header + Logout */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 20, textAlign: "center" }}>
+          📊 Admin Management
+        </h1>
+        <button
+          onClick={handleLogout}
           style={{
-            background: "#fee2e2",
-            color: "#b91c1c",
-            padding: "10px 14px",
+            background: "#ef4444",
+            color: "#fff",
+            border: "none",
+            padding: "8px 16px",
             borderRadius: 8,
-            marginBottom: 20,
-            textAlign: "center",
             fontWeight: 600,
+            cursor: "pointer",
           }}
         >
-          {message}
-        </div>
-      )}
+          🚪 Logout
+        </button>
+      </div>
 
       {/* Users Table */}
       <section style={{ marginBottom: 40 }}>
-        <h2
-          style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}
-        >
-          👤 Users
-        </h2>
+        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>👤 Users</h2>
         <div
           style={{
             overflowX: "auto",
@@ -106,44 +125,42 @@ export default function AdminManagement() {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                <th
-                  style={{
-                    padding: 12,
-                    background: "#10b981",
-                    color: "#fff",
-                    textAlign: "left",
-                    fontWeight: 600,
-                  }}
-                >
-                  ID
-                </th>
+                <th style={{ padding: 12, background: "#10b981", color: "#fff" }}>#</th>
                 <th style={{ padding: 12, background: "#10b981", color: "#fff" }}>ชื่อ</th>
                 <th style={{ padding: 12, background: "#10b981", color: "#fff" }}>Email</th>
                 <th style={{ padding: 12, background: "#10b981", color: "#fff" }}>Phone</th>
-                <th style={{ padding: 12, background: "#10b981", color: "#fff" }}>isAdmin</th>
+                <th style={{ padding: 12, background: "#10b981", color: "#fff" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {users.length > 0 ? (
-                users.map((u) => (
+                users.map((u, index) => (
                   <tr key={u._id}>
-                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u._id}</td>
+                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{index + 1}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u.name}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u.email}</td>
+                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u.phone || "-"}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
-                      {u.phone || "-"}
-                    </td>
-                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
-                      {u.role === "admin" ? "✅" : "❌"}
+                      <button
+                        onClick={() => handleDeleteUser(u._id)}
+                        style={{
+                          background: "#ef4444",
+                          color: "#fff",
+                          border: "none",
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        🗑 Delete
+                      </button>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td
-                    colSpan={5}
-                    style={{ textAlign: "center", color: "#9ca3af", padding: 10 }}
-                  >
+                  <td colSpan={5} style={{ textAlign: "center", color: "#9ca3af", padding: 10 }}>
                     ไม่มีข้อมูลผู้ใช้
                   </td>
                 </tr>
@@ -155,11 +172,7 @@ export default function AdminManagement() {
 
       {/* Bookings Table */}
       <section style={{ marginBottom: 40 }}>
-        <h2
-          style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}
-        >
-          📝 Bookings
-        </h2>
+        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>📝 Bookings</h2>
         <div
           style={{
             overflowX: "auto",
@@ -171,7 +184,7 @@ export default function AdminManagement() {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                {["ID", "User", "Date", "Court", "Hour", "Note"].map((h) => (
+                {["#", "User", "Date", "Court", "Hour", "Note"].map((h) => (
                   <th
                     key={h}
                     style={{
@@ -189,28 +202,21 @@ export default function AdminManagement() {
             </thead>
             <tbody>
               {bookings.length > 0 ? (
-                bookings.map((b) => (
+                bookings.map((b, index) => (
                   <tr key={b._id}>
-                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{b._id}</td>
-                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
-                      {b.user?.name || "-"}
-                    </td>
+                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{index + 1}</td>
+                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{b.user?.name || "-"}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{b.date}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{b.court}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
                       {`${b.hour}:00 - ${b.hour + 1}:00`}
                     </td>
-                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
-                      {b.note || "-"}
-                    </td>
+                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{b.note || "-"}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td
-                    colSpan={6}
-                    style={{ textAlign: "center", color: "#9ca3af", padding: 10 }}
-                  >
+                  <td colSpan={6} style={{ textAlign: "center", color: "#9ca3af", padding: 10 }}>
                     ไม่มีข้อมูลการจอง
                   </td>
                 </tr>
