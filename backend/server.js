@@ -126,7 +126,7 @@ app.get("/api/admin/bookings", isAdmin, async (req, res) => {
       date: b.date,
       court: b.court,
       hour: b.hour,
-      note: b.note,
+      status: "booked"
     }));
     res.json({ bookings: formatted });
   } catch (err) {

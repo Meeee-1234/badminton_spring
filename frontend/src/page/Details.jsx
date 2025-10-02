@@ -193,7 +193,6 @@ const handleConfirm = async () => {
           date: dateKey,
           court: s.court,
           hour: s.hour,
-          note,
         }),
       });
       const data = await res.json();
