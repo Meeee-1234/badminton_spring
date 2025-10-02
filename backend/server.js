@@ -64,21 +64,6 @@ const bookingSchema = new mongoose.Schema(
 const Booking = mongoose.model("Booking", bookingSchema);
 
 
-
-
-// ---------- Multer Config ----------
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, unique + path.extname(file.originalname));
-  },
-});
-const upload = multer({ storage });
-
-
 // ---------- Routes ----------
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to the Badminton API!" });

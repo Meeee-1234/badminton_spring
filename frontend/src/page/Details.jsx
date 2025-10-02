@@ -9,7 +9,7 @@ const OPEN_HOUR = 9;
 const CLOSE_HOUR = 21; // ช่องสุดท้าย 20:00–21:00
 const HOURS = Array.from({ length: CLOSE_HOUR - OPEN_HOUR }, (_, i) => OPEN_HOUR + i);
 const COURTS = [1, 2, 3, 4, 5, 6];
-const PRICE_PER_HOUR = 80;
+const PRICE_PER_HOUR = 120;
 
 /** THEME (โทนเขียวอ่อน) */
 const colors = {
