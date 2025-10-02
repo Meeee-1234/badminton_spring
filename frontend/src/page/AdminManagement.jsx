@@ -64,10 +64,9 @@ export default function AdminManagement() {
           fetch(`${API}/api/admin/users`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch(`${API}/api/bookings`, {
+          fetch(`${API}/api/admin/bookings`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-
         ]);
 
         if (!userRes.ok || !bookingRes.ok) throw new Error("โหลดข้อมูลไม่สำเร็จ");

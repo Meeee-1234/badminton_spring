@@ -18,7 +18,7 @@ app.use(
       "http://localhost:3000",
       "https://badminton-mongo.vercel.app",
       "https://badminton-hzwm.vercel.app"
-    ],
+        ],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     credentials: true,
   })
@@ -56,22 +56,14 @@ const User = mongoose.model("User", userSchema);
 const bookingSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    date: { type: String, required: true },   // YYYY-MM-DD
+    date: { type: String, required: true }, // YYYY-MM-DD
     court: { type: Number, required: true }, // คอร์ต 1-6
-    hour: { type: Number, required: true },  // เช่น 9 = 9:00-10:00
-    status: {
-      type: String,
-      enum: ["booked", "arrived", "canceled"],
-      default: "booked"   // ✅ ถ้ามีการสร้าง booking ใหม่ จะเป็น "booked" โดยอัตโนมัติ
-    },
+    hour: { type: Number, required: true },  // ชั่วโมง เช่น 9 = 9:00-10:00
   },
   { timestamps: true, collection: "bookings" }
 );
 
-
 const Booking = mongoose.model("Booking", bookingSchema);
-
-
 
 
 // ---------- Admin Seed ----------
@@ -120,49 +112,22 @@ app.get("/api/admin/users", isAdmin, async (req, res) => {
 });
 
 
-// ===== Auth Middleware =====
-const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
-
-function authMiddleware(req, res, next) {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1]; // Bearer <token>
-
-  if (!token) {
-    return res.status(401).json({ error: "No token provided" });
-  }
-
+app.get("/api/admin/bookings", isAdmin, async (req, res) => {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded; // เก็บข้อมูล user ไว้ใน req
-    next();
+    const bookings = await Booking.find().populate("user", "name email");
+    const formatted = bookings.map((b) => ({
+      _id: b._id,
+      user: b.user ? { name: b.user.name, email: b.user.email } : null,
+      date: b.date,
+      court: b.court,
+      hour: b.hour,
+      note: b.note,
+    }));
+    res.json({ bookings: formatted });
   } catch (err) {
-    return res.status(403).json({ error: "Invalid token" });
-  }
-}
-
-app.post("/api/bookings", authMiddleware, async (req, res) => {
-  try {
-    const { userId, date, court, hour } = req.body;
-
-    const exist = await Booking.findOne({ date, court, hour });
-    if (exist) return res.status(400).json({ error: "ช่วงเวลานี้ถูกจองแล้ว" });
-
-    const booking = new Booking({
-      user: userId,
-      date,
-      court,
-      hour,
-      status: "booked" // default
-    });
-
-    await booking.save();
-    res.json({ message: "✅ จองสำเร็จ", booking });
-  } catch (err) {
-    console.error("Booking error:", err);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error: "Failed to fetch bookings" });
   }
 });
-
 
 // ✏️ Soft Delete User (Admin only)
 app.delete("/api/admin/users/:id", isAdmin, async (req, res) => {
@@ -194,7 +159,6 @@ app.delete("/api/admin/users/:id", isAdmin, async (req, res) => {
     res.status(500).json({ error: "Server error", detail: err.message });
   }
 });
-
 
 
 
@@ -361,26 +325,24 @@ app.get("/api/bookings/taken", async (req, res) => {
 });
 
 // ✅ จองสนามใหม่
-app.post("/api/bookings", authMiddleware, async (req, res) => {
+app.post("/api/bookings", async (req, res) => {
   try {
-    const { userId, date, court, hour } = req.body;
+    const { userId, date, court, hour, note } = req.body;
+    if (!userId || !date || court == null || hour == null) {
+      return res.status(400).json({ error: "ต้องส่ง userId, date, court, hour" });
+    }
 
-    // ตรวจสอบซ้ำ
-    const exist = await Booking.findOne({ date, court, hour });
-    if (exist) return res.status(400).json({ error: "ช่วงเวลานี้ถูกจองแล้ว" });
 
-    const booking = new Booking({
-      user: userId,
-      date,
-      court,
-      hour,
-      status: "booked"   // ✅ กำหนดค่าเริ่มต้น
-    });
+    // กันไม่ให้ซ้ำ
+    const exists = await Booking.findOne({ date, court, hour });
+    if (exists) {
+      return res.status(409).json({ error: "ช่วงเวลานี้ถูกจองแล้ว" });
+    }
 
-    await booking.save();
-    res.json({ message: "✅ จองสำเร็จ", booking });
+    const booking = await Booking.create({ user: userId, date, court, hour, note });
+    res.status(201).json({ message: "จองสำเร็จ", booking });
   } catch (err) {
-    console.error("Booking error:", err);
+    console.error("❌ Booking error:", err.message);
     res.status(500).json({ error: "Server error" });
   }
 });
