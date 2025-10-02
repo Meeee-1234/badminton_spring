@@ -1,6 +1,6 @@
 // src/Details.jsx
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom"; // ✅ ปุ่มกลับหน้าแรก
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
 
@@ -10,27 +10,6 @@ const CLOSE_HOUR = 21; // ช่องสุดท้าย 20:00–21:00
 const HOURS = Array.from({ length: CLOSE_HOUR - OPEN_HOUR }, (_, i) => OPEN_HOUR + i);
 const COURTS = [1, 2, 3, 4, 5, 6];
 const PRICE_PER_HOUR = 80;
-
-/** ย่อทั้งหน้า 50% */
-const SCALE = 0.5;
-
-// ปรับส่วนสูงพื้นที่เหนือ/ใต้ตาราง (ยิ่งเลขมาก ตารางยิ่งเตี้ยลง)
-// เมื่อใช้ SCALE แล้วมักพอดี ถ้ายังไม่เป๊ะให้ปรับเลขนี้
-const OFFSET_PX = 220;
-
-const ENDPOINTS = {
-  taken: (date) => `${API}/api/bookings/taken?date=${encodeURIComponent(date)}`,
-  create: `${API}/api/bookings`,
-};
-
-const toDateKey = (d = new Date()) => d.toISOString().split("T")[0];
-const msUntilNextMidnight = () => {
-  const now = new Date();
-  const next = new Date(now);
-  next.setDate(now.getDate() + 1);
-  next.setHours(0, 0, 0, 0);
-  return next.getTime() - now.getTime();
-};
 
 /** THEME (โทนเขียวอ่อน) */
 const colors = {
@@ -49,8 +28,25 @@ const colors = {
   taken: "#eef2f4",
 };
 
+/** เปลี่ยนเส้นทาง API ให้ตรงกับระบบคุณ */
+const ENDPOINTS = {
+  taken: (date) => `${API}/api/bookings/taken?date=${encodeURIComponent(date)}`,
+  create: `${API}/api/bookings`,
+};
+
+const toDateKey = (d = new Date()) => d.toISOString().split("T")[0];
+const msUntilNextMidnight = () => {
+  const now = new Date();
+  const next = new Date(now);
+  next.setDate(now.getDate() + 1);
+  next.setHours(0, 0, 0, 0);
+  return next.getTime() - now.getTime();
+};
+
 export default function Details() {
   const navigate = useNavigate();
+
+  // 🔒 วัน “วันนี้” อัตโนมัติ
   const [dateKey, setDateKey] = useState(() => toDateKey());
   const [taken, setTaken] = useState([]);       // ["1:9","2:10"]
   const [selected, setSelected] = useState([]); // [{court, hour}]
@@ -58,10 +54,62 @@ export default function Details() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
-  const totalHours = selected.length;
-  const totalPrice = totalHours * PRICE_PER_HOUR;
+  // ✅ สเกลอัตโนมัติให้ “พอดีจอ”
+  const [scale, setScale] = useState(1);
+  const viewportRef = useRef(null);  // โซนที่ใช้เทียบขนาดหน้าจอ (ทั้งหน้า)
+  const contentRef = useRef(null);   // คอนเทนต์จริงก่อน scale
 
-  // วันใหม่อัตโนมัติ เที่ยงคืน
+  // คำนวณ scale เมื่อโหลด/เปลี่ยนขนาดหน้าต่าง/เนื้อหา
+  useLayoutEffect(() => {
+    const calc = () => {
+      const vp = viewportRef.current;
+      const ct = contentRef.current;
+      if (!vp || !ct) return;
+
+      // กำหนดเป็น 1 ชั่วคราวเพื่อวัด “ขนาดจริง” ก่อนสเกล
+      ct.style.transform = "scale(1)";
+      ct.style.width = "auto";
+
+      const pad = 8; // กันไม่ให้ชิดริมเกินไป
+      const availW = Math.max(320, window.innerWidth - pad * 2);
+      const availH = Math.max(320, window.innerHeight - pad * 2);
+
+      const rect = ct.getBoundingClientRect(); // ขนาดจริงไม่สเกล
+      const neededW = rect.width;
+      const neededH = rect.height;
+
+      let s = Math.min(availW / neededW, availH / neededH, 1);
+      // ปัดสเกลเล็กน้อยเพื่อลด jitter
+      s = Math.max(0.1, Math.min(1, Number(s.toFixed(3))));
+
+      // ปรับสเกล + ชดเชยความกว้างหลังสเกล เพื่อตัดสกรอลล์
+      ct.style.transform = `scale(${s})`;
+      ct.style.transformOrigin = "top left";
+      ct.style.width = s < 1 ? `${100 / s}%` : "auto";
+
+      setScale(s);
+      // ปิดสกรอลล์ทั้งหน้า
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.overflow = "hidden";
+    };
+
+    calc();
+    const onResize = () => calc();
+
+    // ใช้ ResizeObserver เผื่อคอนเทนต์เปลี่ยนขนาดเอง
+    const ro = new ResizeObserver(calc);
+    if (contentRef.current) ro.observe(contentRef.current);
+
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      ro.disconnect();
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+    };
+  }, []);
+
+  // อัปเดตเป็นวันใหม่อัตโนมัติเที่ยงคืน
   useEffect(() => {
     const tick = () => {
       const today = toDateKey();
@@ -146,19 +194,14 @@ export default function Details() {
     }
   };
 
-  // ปุ่มกลับหน้าแรก (fallback ถ้าไม่มี router)
   const goHome = () => {
-    try {
-      navigate("/");
-    } catch {
-      window.location.href = "/";
-    }
+    try { navigate("/"); } catch { window.location.href = "/"; }
   };
 
   return (
-    <div style={ui.page}>
-      {/* ✅ ตัวครอบย่อทั้งหน้า SCALE 50% และแก้ความกว้างให้พอดี */}
-      <div style={ui.scaleWrap}>
+    <div ref={viewportRef} style={ui.page}>
+      {/* ✅ ตัวคอนเทนต์จริง — จะถูกสเกลให้พอดีจออัตโนมัติ */}
+      <div ref={contentRef} style={ui.contentWrap}>
         <div style={ui.container}>
           {/* ซ้าย: ตาราง */}
           <section style={ui.left}>
@@ -190,18 +233,17 @@ export default function Details() {
               </div>
             </div>
 
-            {/* ตารางคอร์ต x ชั่วโมง — ไม่มีสกรอลล์ */}
+            {/* ตารางคอร์ต x ชั่วโมง — คงขนาดสวยงาม แล้วให้ wrapper สเกลลง/ขึ้นตามจอ */}
             <div style={ui.tableFrame}>
-              {/* หัวคอลัมน์ */}
               <div style={ui.headerRow}>
-                <div style={{ ...ui.headerCell, width: 120, textAlign: "left" }}>ช่วงเวลา</div>
+                <div style={{ ...ui.headerCell, width: 140, textAlign: "left" }}>ช่วงเวลา</div>
                 {COURTS.map((c) => (
                   <div key={c} style={ui.headerCell}>คอร์ต {c}</div>
                 ))}
               </div>
 
-              {/* โซนบอดี้เต็มจอ */}
-              <div role="table" aria-label="ตารางการจองคอร์ตแบดมินตัน" style={ui.bodyNoScroll}>
+              {/* body ขนาด “ออกแบบ” (ไม่สกรอลล์เอง) */}
+              <div role="table" aria-label="ตารางการจองคอร์ตแบดมินตัน" style={ui.bodyGrid}>
                 {HOURS.map((h, idx) => (
                   <div key={h} role="row" style={{ ...ui.row, ...(idx % 2 === 1 ? ui.rowAlt : null) }}>
                     <div role="cell" style={{ ...ui.timeCell }}>{formatHourLabel(h)}</div>
@@ -236,10 +278,10 @@ export default function Details() {
             <div style={ui.card}>
               <h2 style={ui.cardTitle}>สรุปการจอง</h2>
               <div style={ui.summaryRow}><span>วันที่</span><b>{dateKey}</b></div>
-              <div style={ui.summaryRow}><span>จำนวนรายการ</span><b>{totalHours} ชั่วโมง</b></div>
+              <div style={ui.summaryRow}><span>จำนวนรายการ</span><b>{selected.length} ชั่วโมง</b></div>
               <div style={ui.summaryRow}><span>ราคา/ชั่วโมง</span><b>{PRICE_PER_HOUR.toLocaleString()} บาท</b></div>
               <div style={{ ...ui.summaryRow, borderTop: `1px dashed ${colors.line}`, paddingTop: 10, marginTop: 6 }}>
-                <span>รวมทั้งสิ้น</span><b style={{ color: colors.accent }}>{totalPrice.toLocaleString()} บาท</b>
+                <span>รวมทั้งสิ้น</span><b style={{ color: colors.accent }}>{(selected.length * PRICE_PER_HOUR).toLocaleString()} บาท</b>
               </div>
 
               <div style={{ marginTop: 12 }}>
@@ -250,7 +292,7 @@ export default function Details() {
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="เช่น ต้องการคอร์ตติดผนัง / เปิดไฟเพิ่ม"
                   style={ui.textarea}
-                  rows={2}
+                  rows={3}
                 />
               </div>
 
@@ -264,7 +306,7 @@ export default function Details() {
 
               {!!selected.length && (
                 <>
-                  <div style={{ marginTop: 12, fontSize: 12, color: colors.muted }}>รายการที่เลือก</div>
+                  <div style={{ marginTop: 14, fontSize: 13, color: colors.muted }}>รายการที่เลือก</div>
                   <ul style={ui.selectedList}>
                     {selected
                       .slice()
@@ -295,7 +337,7 @@ export default function Details() {
   );
 }
 
-/** ===== UI styles (ย่อ 50% ด้วย scale + ความกว้างชดเชย) ===== */
+/** ===== UI (ออกแบบให้สวย แล้วสเกลทั้งบล็อกให้พอดีจอ) ===== */
 const ui = {
   page: {
     minHeight: "100vh",
@@ -303,33 +345,34 @@ const ui = {
     color: colors.ink,
     fontFamily:
       'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", sans-serif',
-    padding: 12,
-    overflow: "hidden",
+    padding: 8,
+    overflow: "hidden", // ป้องกันเกิดสกรอลล์ของทั้งหน้า
   },
 
-  // ✅ เทคนิคย่อทั้งหน้า: scale แล้วชดเชยความกว้างเพื่อไม่ให้เกิดสกรอลล์
-  scaleWrap: {
-    transform: `scale(${SCALE})`,
+  // ตัวห่อคอนเทนต์ซึ่งจะถูก scale แบบ dynamic ด้วย JS
+  contentWrap: {
+    transform: "scale(1)",
     transformOrigin: "top left",
-    width: `${100 / SCALE}%`,
+    width: "auto", // จะถูกเปลี่ยนเป็น 100/scale% ถ้าต้องสเกลลง
   },
 
   container: {
-    maxWidth: "100vw",
+    // ขนาด "ออกแบบ" — ให้คำนวณสเกลง่ายและภาพรวมดูบาลานซ์
+    width: 1200,
     margin: "0 auto",
     display: "grid",
-    gridTemplateColumns: "1fr 300px",
-    gap: 12,
+    gridTemplateColumns: "1fr 340px",
+    gap: 16,
   },
 
   /* Left */
-  left: { minWidth: 0, overflow: "hidden" },
+  left: { minWidth: 0 },
   toolbar: {
     display: "flex",
     alignItems: "flex-end",
     justifyContent: "space-between",
-    gap: 8,
-    marginBottom: 8,
+    gap: 12,
+    marginBottom: 10,
     flexWrap: "wrap",
   },
   backBtn: {
@@ -340,11 +383,11 @@ const ui = {
     cursor: "pointer",
     fontWeight: 700,
   },
-  labelSm: { display: "block", fontSize: 11, fontWeight: 700, marginBottom: 4, color: colors.muted },
+  labelSm: { display: "block", fontSize: 13, fontWeight: 700, marginBottom: 6, color: colors.muted },
   badgeNote: {
     display: "inline-block",
-    fontSize: 10,
-    padding: "4px 8px",
+    fontSize: 12,
+    padding: "6px 10px",
     borderRadius: 999,
     background: colors.primarySoft,
     color: colors.primaryDark,
@@ -352,11 +395,11 @@ const ui = {
     width: "fit-content",
   },
   dateInput: {
-    padding: "8px 10px",
+    padding: "10px 12px",
     border: `1px solid ${colors.line}`,
     borderRadius: 10,
     background: "#fff",
-    fontSize: 12,
+    fontSize: 14,
     outline: "none",
   },
 
@@ -364,38 +407,37 @@ const ui = {
   legendWrap: {
     display: "flex",
     alignItems: "center",
-    gap: 10,
+    gap: 14,
     background: "#fff",
-    padding: "6px 10px",
+    padding: "8px 12px",
     borderRadius: 999,
     border: `1px solid ${colors.line}`,
-    boxShadow: "0 3px 12px rgba(2,6,12,.05)",
+    boxShadow: "0 4px 18px rgba(2,6,12,.05)",
     whiteSpace: "nowrap",
   },
-  legendItem: { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: colors.muted },
-  dotFree: { display: "inline-block", width: 10, height: 10, borderRadius: 999, background: "#fff", border: `1px solid ${colors.lineStrong}` },
-  dotPicked: { display: "inline-block", width: 10, height: 10, borderRadius: 999, background: colors.primary, border: `1px solid ${colors.primaryDark}` },
-  dotTaken: { display: "inline-block", width: 10, height: 10, borderRadius: 999, background: colors.taken, border: `1px solid ${colors.lineStrong}` },
+  legendItem: { display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: colors.muted },
+  dotFree:  { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: "#fff", border: `1px solid ${colors.lineStrong}` },
+  dotPicked:{ display: "inline-block", width: 12, height: 12, borderRadius: 999, background: colors.primary, border: `1px solid ${colors.primaryDark}` },
+  dotTaken: { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: colors.taken, border: `1px solid ${colors.lineStrong}` },
 
   /* กรอบตาราง */
   tableFrame: {
     background: colors.card,
     border: `1px solid ${colors.lineStrong}`,
-    borderRadius: 14,
-    boxShadow: "0 10px 24px rgba(2,6,12,0.06)",
+    borderRadius: 16,
+    boxShadow: "0 12px 30px rgba(2,6,12,0.06)",
     overflow: "hidden",
   },
-
   headerRow: {
     display: "grid",
-    gridTemplateColumns: `120px repeat(${COURTS.length}, 1fr)`,
+    gridTemplateColumns: `140px repeat(${COURTS.length}, 1fr)`,
     borderBottom: `1px solid ${colors.lineStrong}`,
     background: colors.primarySoft,
     boxShadow: "inset 0 -1px 0 " + colors.lineStrong,
   },
   headerCell: {
-    padding: "10px 8px",
-    fontSize: 11,
+    padding: "12px 10px",
+    fontSize: 13,
     fontWeight: 900,
     textAlign: "center",
     borderLeft: `1px solid ${colors.lineStrong}`,
@@ -403,27 +445,20 @@ const ui = {
     letterSpacing: 0.2,
   },
 
-  // ไม่มีสกรอลล์: แถวสูงเท่ากันรวมทั้งบล็อกพอดีจอ (หลัง scale แล้ว)
-  bodyNoScroll: {
-    height: `calc(100vh - ${OFFSET_PX}px)`,
+  // บอดี้: เรา “ออกแบบ” ให้สวยก่อน แล้วให้ wrapper สเกลภาพรวมให้พอดีจอ
+  bodyGrid: {
     display: "grid",
     gridAutoFlow: "row",
-    gridTemplateRows: `repeat(${HOURS.length}, 1fr)`,
-    overflow: "hidden",
   },
-
   row: {
     display: "grid",
-    gridTemplateColumns: `120px repeat(${COURTS.length}, 1fr)`,
+    gridTemplateColumns: `140px repeat(${COURTS.length}, 1fr)`,
     borderTop: `1px solid ${colors.line}`,
   },
   rowAlt: { background: "#fbfdfc" },
-
   timeCell: {
-    padding: "0 8px",
-    display: "flex",
-    alignItems: "center",
-    fontSize: 11,
+    padding: "12px 10px",
+    fontSize: 13,
     textAlign: "left",
     background: "#ffffff",
     borderRight: `1px solid ${colors.lineStrong}`,
@@ -431,9 +466,8 @@ const ui = {
   },
 
   cellBtn: {
-    width: "100%",
-    height: "100%",
-    fontSize: 11,
+    padding: "14px 8px",
+    fontSize: 13,
     background: "#fff",
     border: "none",
     borderLeft: `1px solid ${colors.line}`,
@@ -456,9 +490,9 @@ const ui = {
   },
 
   statusPill: (isTaken, isPicked) => ({
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 800,
-    padding: "4px 8px",
+    padding: "6px 10px",
     borderRadius: 999,
     border: `1px solid ${isTaken ? colors.lineStrong : isPicked ? colors.primaryDark : colors.lineStrong}`,
     background: isTaken ? "#f1f5f9" : isPicked ? "#dcfce7" : "#ffffff",
@@ -467,33 +501,31 @@ const ui = {
   }),
 
   /* Right */
-  right: { minWidth: 0, overflow: "hidden" },
+  right: { minWidth: 0 },
   card: {
     background: colors.card,
     border: `1px solid ${colors.line}`,
-    borderRadius: 14,
-    boxShadow: "0 10px 24px rgba(2,6,12,0.06)",
-    padding: 12,
+    borderRadius: 16,
+    boxShadow: "0 12px 30px rgba(2,6,12,0.06)",
+    padding: 14,
     position: "sticky",
-    top: 12,
-    maxHeight: "calc(100vh - 24px)",
-    overflow: "auto",
+    top: 0,
   },
-  cardTitle: { margin: 0, fontSize: 16, fontWeight: 900, color: colors.primaryDark },
+  cardTitle: { margin: 0, fontSize: 18, fontWeight: 900, color: colors.primaryDark },
   summaryRow: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    fontSize: 12,
-    marginTop: 8,
+    fontSize: 14,
+    marginTop: 10,
   },
   textarea: {
     width: "100%",
-    padding: "8px 10px",
-    borderRadius: 10,
+    padding: "10px 14px",
+    borderRadius: 12,
     border: `1px solid ${colors.line}`,
     outline: "none",
-    fontSize: 12,
+    fontSize: 14,
     lineHeight: "1.5",
     background: "#fff",
     resize: "vertical",
@@ -501,18 +533,18 @@ const ui = {
   },
   confirmBtn: {
     width: "100%",
-    marginTop: 10,
-    padding: "10px 12px",
+    marginTop: 12,
+    padding: "12px 14px",
     background: colors.primaryDark,
     color: "#fff",
     border: "none",
-    borderRadius: 10,
+    borderRadius: 12,
     cursor: "pointer",
     fontWeight: 800,
-    fontSize: 13,
+    fontSize: 15,
   },
   selectedList: {
-    marginTop: 6,
+    marginTop: 8,
     listStyle: "none",
     padding: 0,
     borderTop: `1px solid ${colors.line}`,
@@ -520,10 +552,10 @@ const ui = {
   selectedItem: {
     display: "grid",
     gridTemplateColumns: "auto 1fr auto",
-    gap: 6,
+    gap: 8,
     alignItems: "center",
-    padding: "6px 0",
-    fontSize: 12,
+    padding: "8px 0",
+    fontSize: 13,
     borderBottom: `1px dashed ${colors.line}`,
   },
   removeBtn: {
@@ -534,8 +566,8 @@ const ui = {
     cursor: "pointer",
   },
   message: {
-    marginTop: 8,
-    fontSize: 12,
+    marginTop: 10,
+    fontSize: 14,
     textAlign: "center",
     color: colors.accent,
   },

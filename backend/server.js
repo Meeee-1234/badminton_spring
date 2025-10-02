@@ -5,9 +5,6 @@ const cors = require("cors");
 const bcrypt = require("bcrypt");
 require("dotenv").config();
 
-// Avatar
-const path = require("path");
-const multer = require("multer");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -67,16 +64,7 @@ const bookingSchema = new mongoose.Schema(
 const Booking = mongoose.model("Booking", bookingSchema);
 
 
-// Profile Schema
-const profileSchema = new mongoose.Schema(
-  {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
-    avatar: { type: String, default: "" }, // เก็บ URL รูป (เช่น /uploads/xxx.png หรือ Cloudinary)
-  },
-  { timestamps: true, collection: "profiles" }
-);
 
-const Profile = mongoose.model("Profile", profileSchema);
 
 // ---------- Multer Config ----------
 const storage = multer.diskStorage({
@@ -225,6 +213,20 @@ app.put("/api/users/:id", async (req, res) => {
 });
 
 
+// ---------- Profile Schema ----------
+const profileSchema = new mongoose.Schema(
+  {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
+    emergencyName: { type: String, default: "" },   // ชื่อผู้ติดต่อฉุกเฉิน
+    emergencyPhone: { type: String, default: "" },  // เบอร์โทรฉุกเฉิน
+  },
+  { timestamps: true, collection: "profiles" }
+);
+
+const Profile = mongoose.model("Profile", profileSchema);
+
+
+
 
 // ---------- Booking Routes ----------
 
@@ -282,35 +284,40 @@ app.get("/api/bookings/my/:userId", async (req, res) => {
 });
 
 
-
-
-// ---------- Upload Avatar ----------
-app.post("/api/profile/:userId/avatar", upload.single("avatar"), async (req, res) => {
+// POST หรือ PUT profile
+app.post("/api/profile/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-
-    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    const { emergencyName, emergencyPhone } = req.body;
 
     const profile = await Profile.findOneAndUpdate(
       { user: userId },
-      { avatar: fileUrl },
-      { new: true, upsert: true }
+      { emergencyName, emergencyPhone },
+      { new: true, upsert: true } // upsert = ถ้ายังไม่มี profile ให้สร้างใหม่
     );
 
-    res.json({ message: "อัพโหลดสำเร็จ", avatar: fileUrl, profile });
+    res.json({ message: "อัพเดตโปรไฟล์เรียบร้อย", profile });
   } catch (err) {
-    console.error("Upload error:", err.message);
+    console.error("❌ Profile update error:", err.message);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// ---------- Static for uploads ----------
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.get("/api/profile/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const profile = await Profile.findOne({ user: userId });
 
+    if (!profile) {
+      return res.status(404).json({ error: "ไม่พบโปรไฟล์" });
+    }
 
-
-
+    res.json(profile);
+  } catch (err) {
+    console.error("❌ Profile get error:", err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 
 
