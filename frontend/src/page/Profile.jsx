@@ -61,7 +61,7 @@ export default function Profile() {
   const handleLogout = () => {
     localStorage.removeItem("auth:token");
     localStorage.removeItem("auth:user");
-    navigate("/login");
+    navigate("/");
   };
 
   const handleEmergencyChange = (e) => {

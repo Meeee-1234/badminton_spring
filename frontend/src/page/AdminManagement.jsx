@@ -1,8 +1,7 @@
-// src/pages/AdminManagement.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-//const API = process.env.REACT_APP_API_URL || "https://badminton-mongo.vercel.app";
+// const API = process.env.REACT_APP_API_URL || "https://badminton-mongo.vercel.app";
 const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
 
 export default function AdminManagement() {
@@ -11,54 +10,6 @@ export default function AdminManagement() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
-
-  // ===== Admin Guard (ฝั่ง client) =====
-  useEffect(() => {
-    const token = localStorage.getItem("auth:token");
-    const rawUser = localStorage.getItem("auth:user");
-
-    if (!token || !rawUser) {
-      setMessage("❌ Unauthorized: กรุณา login เป็น admin");
-      setLoading(false);
-      navigate("/login");
-      return;
-    }
-
-    let user = null;
-    try { user = JSON.parse(rawUser); } catch {}
-
-    if (!user || user.role !== "admin") {
-      setMessage("❌ Forbidden: เฉพาะผู้ดูแลระบบเท่านั้น");
-      setLoading(false);
-      navigate("/"); // หรือ /login
-      return;
-    }
-
-    // ===== ยืนยันกับเซิร์ฟเวอร์อีกรอบ (แนะนำ) =====
-    (async () => {
-      try {
-        // ใช้ /api/admin/ping หรือ /api/admin/users ก็ได้ (ต้อง require admin ฝั่ง server)
-        const res = await fetch(`${API}/api/admin/ping`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        });
-        if (!res.ok) {
-          setMessage("❌ ไม่มีสิทธิ์เข้าถึง (server denied)");
-          setLoading(false);
-          navigate("/login");
-          return;
-        }
-        // ผ่าน -> ค่อยไปโหลดข้อมูลจริง
-        await fetchAllData(token);
-      } catch (err) {
-        console.error("Verify admin failed:", err);
-        setMessage("❌ ตรวจสอบสิทธิ์ล้มเหลว");
-        setLoading(false);
-        navigate("/login");
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // ✅ Logout
   const handleLogout = () => {
@@ -78,6 +29,7 @@ export default function AdminManagement() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
+      // 👀 Debug: อ่าน response เป็น text ก่อน
       const text = await res.text();
       console.log("📌 Raw response:", text);
 
@@ -91,72 +43,54 @@ export default function AdminManagement() {
       if (!res.ok) throw new Error(data.error || "ลบผู้ใช้ไม่สำเร็จ");
 
       setUsers((prev) => prev.filter((u) => u._id !== id));
-      alert("✅ " + (data.message || "ลบสำเร็จ"));
+      alert("✅ " + data.message);
     } catch (err) {
       console.error("❌ Delete user error:", err);
       alert("❌ " + err.message);
     }
   };
 
-  // ===== โหลดข้อมูลทั้งหมด (users + bookings) =====
-  const fetchAllData = async (token) => {
-    try {
-      const [userRes, bookingRes] = await Promise.all([
-        fetch(`${API}/api/admin/users`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        }),
-        fetch(`${API}/api/admin/bookings`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        }),
-      ]);
-
-      if (userRes.status === 401 || userRes.status === 403) {
-        setMessage("❌ ไม่มีสิทธิ์เข้าถึงผู้ใช้");
-        setLoading(false);
-        navigate("/login");
-        return;
-      }
-      if (bookingRes.status === 401 || bookingRes.status === 403) {
-        setMessage("❌ ไม่มีสิทธิ์เข้าถึงการจอง");
-        setLoading(false);
-        navigate("/login");
-        return;
-      }
-
-      if (!userRes.ok || !bookingRes.ok) throw new Error("โหลดข้อมูลไม่สำเร็จ");
-
-      const [userData, bookingData] = await Promise.all([
-        userRes.json(),
-        bookingRes.json(),
-      ]);
-
-      const filteredUsers = (userData.users || []).filter((u) => u.role !== "admin");
-      setUsers(filteredUsers);
-      setBookings(bookingData.bookings || []);
+  useEffect(() => {
+    const token = localStorage.getItem("auth:token");
+    if (!token) {
+      setMessage("❌ Unauthorized: กรุณา login เป็น admin");
       setLoading(false);
-    } catch (err) {
-      console.error("โหลดข้อมูลล้มเหลว:", err);
-      setMessage("❌ โหลดข้อมูลไม่สำเร็จ");
-      setLoading(false);
+      return;
     }
-  };
 
-  if (loading) {
-    return (
-      <div
-        style={{
-          padding: 20,
-          fontFamily: "Segoe UI, sans-serif",
-          background: "#f9fafb",
-          minHeight: "100vh",
-        }}
-      >
-        กำลังโหลด...
-      </div>
-    );
-  }
+    async function fetchData() {
+      try {
+        const [userRes, bookingRes] = await Promise.all([
+          fetch(`${API}/api/admin/users`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${API}/api/admin/bookings`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+
+        if (!userRes.ok || !bookingRes.ok) throw new Error("โหลดข้อมูลไม่สำเร็จ");
+
+        const [userData, bookingData] = await Promise.all([
+          userRes.json(),
+          bookingRes.json(),
+        ]);
+
+        // filter user ที่ไม่ใช่ admin
+        const filteredUsers = (userData.users || []).filter((u) => u.role !== "admin");
+
+        setUsers(filteredUsers);
+        setBookings(bookingData.bookings || []);
+      } catch (err) {
+        console.error("โหลดข้อมูลล้มเหลว:", err);
+        setMessage("❌ โหลดข้อมูลไม่สำเร็จ");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, []);
 
   return (
     <div
@@ -310,7 +244,6 @@ export default function AdminManagement() {
                       {b.status === "canceled" && "❌ ยกเลิก"}
                       {!b.status && "-"}
                     </td>
-
                   </tr>
                 ))
               ) : (
