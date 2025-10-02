@@ -71,9 +71,6 @@ const bookingSchema = new mongoose.Schema(
 
 const Booking = mongoose.model("Booking", bookingSchema);
 
-// ===== Auth Middleware =====
-//const jwt = require("jsonwebtoken");
-//const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
 
 
@@ -123,6 +120,25 @@ app.get("/api/admin/users", isAdmin, async (req, res) => {
 });
 
 
+// ===== Auth Middleware =====
+const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
+
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1]; // Bearer <token>
+
+  if (!token) {
+    return res.status(401).json({ error: "No token provided" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded; // เก็บข้อมูล user ไว้ใน req
+    next();
+  } catch (err) {
+    return res.status(403).json({ error: "Invalid token" });
+  }
+}
 
 app.post("/api/bookings", authMiddleware, async (req, res) => {
   try {
