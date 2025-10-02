@@ -18,7 +18,7 @@ app.use(
       "http://localhost:3000",
       "https://badminton-mongo.vercel.app",
       "https://badminton-hzwm.vercel.app"
-        ],
+    ],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     credentials: true,
   })
@@ -71,6 +71,28 @@ const bookingSchema = new mongoose.Schema(
 
 const Booking = mongoose.model("Booking", bookingSchema);
 
+// ===== Auth Middleware =====
+const jwt = require("jsonwebtoken");
+const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
+
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1]; // Bearer <token>
+
+  if (!token) {
+    return res.status(401).json({ error: "No token provided" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded; // เก็บข้อมูล user ไว้ใน req
+    next();
+  } catch (err) {
+    return res.status(403).json({ error: "Invalid token" });
+  }
+}
+
+
 
 // ---------- Admin Seed ----------
 async function createAdmin() {
@@ -118,22 +140,30 @@ app.get("/api/admin/users", isAdmin, async (req, res) => {
 });
 
 
-app.get("/api/admin/bookings", isAdmin, async (req, res) => {
+
+app.post("/api/bookings", authMiddleware, async (req, res) => {
   try {
-    const bookings = await Booking.find().populate("user", "name email");
-    const formatted = bookings.map((b) => ({
-      _id: b._id,
-      user: b.user ? { name: b.user.name, email: b.user.email } : null,
-      date: b.date,
-      court: b.court,
-      hour: b.hour,
-      note: b.note,
-    }));
-    res.json({ bookings: formatted });
+    const { userId, date, court, hour } = req.body;
+
+    const exist = await Booking.findOne({ date, court, hour });
+    if (exist) return res.status(400).json({ error: "ช่วงเวลานี้ถูกจองแล้ว" });
+
+    const booking = new Booking({
+      user: userId,
+      date,
+      court,
+      hour,
+      status: "booked" // default
+    });
+
+    await booking.save();
+    res.json({ message: "✅ จองสำเร็จ", booking });
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch bookings" });
+    console.error("Booking error:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
+
 
 // ✏️ Soft Delete User (Admin only)
 app.delete("/api/admin/users/:id", isAdmin, async (req, res) => {
