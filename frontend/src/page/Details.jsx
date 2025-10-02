@@ -1,5 +1,5 @@
 // src/Details.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
 
@@ -9,6 +9,10 @@ const CLOSE_HOUR = 21; // ช่องสุดท้าย 20:00–21:00
 const HOURS = Array.from({ length: CLOSE_HOUR - OPEN_HOUR }, (_, i) => OPEN_HOUR + i);
 const COURTS = [1, 2, 3, 4, 5, 6];
 const PRICE_PER_HOUR = 80;
+
+// ปรับได้: ส่วนสูงโดยประมาณที่ใช้โดย toolbar/legend/ระยะห่างด้านบน
+// ถ้าตารางยังชนหรือเหลือพื้นที่ ปรับเลขนี้ขึ้น/ลงได้ทันที (เช่น 180, 220, 260)
+const OFFSET_PX = 220;
 
 /** เปลี่ยนเส้นทาง API ให้ตรงกับระบบคุณ */
 const ENDPOINTS = {
@@ -28,24 +32,25 @@ const msUntilNextMidnight = () => {
 
 /** ===== THEME (โทนเขียวอ่อน) ===== */
 const colors = {
-  primary: "#34d399",      // เขียวอ่อน
-  primaryDark: "#10b981",  // เขียวกลาง
-  primarySoft: "#ecfdf5",  // พื้นหลังเขียวจาง
-  accent: "#22c55e",       // เขียวสด
+  primary: "#34d399",
+  primaryDark: "#10b981",
+  primarySoft: "#ecfdf5",
+  accent: "#22c55e",
   ink: "#0f172a",
   muted: "#64748b",
   line: "#e5e7eb",
+  lineStrong: "#d1d5db",
   card: "#ffffff",
-  bg: "#f6fef8",           // เขียวอมขาวทั้งหน้า
+  bg: "#f6fef8",
   danger: "#ef4444",
   success: "#16a34a",
-  taken: "#e5e7eb",
+  taken: "#eef2f4",
 };
 
 export default function Details() {
   // 🔒 ล็อกให้เป็น “วันนี้” เสมอ
   const [dateKey, setDateKey] = useState(() => toDateKey());
-  const [taken, setTaken] = useState([]);    // ["1:9","2:10"]
+  const [taken, setTaken] = useState([]);       // ["1:9","2:10"]
   const [selected, setSelected] = useState([]); // [{court, hour}]
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
@@ -54,24 +59,18 @@ export default function Details() {
   const totalHours = selected.length;
   const totalPrice = totalHours * PRICE_PER_HOUR;
 
-  // ⏱️ อัปเดตเป็นวันใหม่อัตโนมัติทุกเที่ยงคืน (และรีเฟรชตาราง)
+  // ⏱️ อัปเดตเป็นวันใหม่อัตโนมัติทุกเที่ยงคืน
   useEffect(() => {
     const tick = () => {
       const today = toDateKey();
       setDateKey((prev) => (prev !== today ? today : prev));
     };
-
-    // ตั้งครั้งแรกตอนเข้า
     tick();
-
-    // setTimeout ถึงเที่ยงคืน จากนั้น setInterval ทุก 24 ชม.
     const first = setTimeout(() => {
       tick();
       const everyDay = setInterval(tick, 24 * 60 * 60 * 1000);
-      // เก็บไว้ในตัวแปร global ของ effect เพื่อเคลียร์
       (window.__dailyTimer__ = everyDay);
     }, msUntilNextMidnight());
-
     return () => {
       clearTimeout(first);
       if (window.__dailyTimer__) {
@@ -81,7 +80,7 @@ export default function Details() {
     };
   }, []);
 
-  // โหลดรายการที่ถูกจองแล้วจาก backend (ทุกครั้งที่วันเปลี่ยน)
+  // โหลดรายการที่ถูกจองแล้วจาก backend
   useEffect(() => {
     fetch(ENDPOINTS.taken(dateKey))
       .then((res) => res.json())
@@ -96,18 +95,16 @@ export default function Details() {
 
   const toggleCell = (c, h) => {
     if (isTaken(c, h)) return;
-    if (isSelected(c, h)) {
-      setSelected((prev) => prev.filter((s) => !(s.court === c && s.hour === h)));
-    } else {
-      setSelected((prev) => [...prev, { court: c, hour: h }]);
-    }
+    setSelected((prev) =>
+      prev.some((s) => s.court === c && s.hour === h)
+        ? prev.filter((s) => !(s.court === c && s.hour === h))
+        : [...prev, { court: c, hour: h }]
+    );
   };
 
-  // ✅ ยืนยันการจอง
   const handleConfirm = async () => {
     setLoading(true);
     setMsg("");
-
     try {
       const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
       if (!user?._id) {
@@ -115,7 +112,6 @@ export default function Details() {
         setLoading(false);
         return;
       }
-
       for (const s of selected) {
         const res = await fetch(ENDPOINTS.create, {
           method: "POST",
@@ -128,7 +124,6 @@ export default function Details() {
             note,
           }),
         });
-
         const data = await res.json();
         if (!res.ok) {
           setMsg(`❌ จองคอร์ต ${s.court} เวลา ${formatHourLabel(s.hour)} ไม่สำเร็จ: ${data.error || "unknown"}`);
@@ -136,12 +131,9 @@ export default function Details() {
           return;
         }
       }
-
       setMsg("✅ จองสำเร็จ!");
       setSelected([]);
       setNote("");
-
-      // reload ตาราง
       const res2 = await fetch(ENDPOINTS.taken(dateKey));
       const data2 = await res2.json();
       setTaken(data2.taken || []);
@@ -161,7 +153,6 @@ export default function Details() {
           <div style={ui.toolbar}>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <label htmlFor="date" style={ui.labelSm}>วันที่ (อัตโนมัติ)</label>
-              {/* 🔒 input ปิดการแก้ไข / disabled */}
               <input
                 id="date"
                 type="date"
@@ -173,46 +164,57 @@ export default function Details() {
               />
               <span style={ui.badgeNote}>ตาราง “วันนี้” • อัปเดตอัตโนมัติเที่ยงคืน</span>
             </div>
+
+            {/* Legend สถานะ */}
+            <div style={ui.legendWrap} aria-hidden>
+              <span style={ui.legendItem}><span style={ui.dotFree} /> ว่าง</span>
+              <span style={ui.legendItem}><span style={ui.dotPicked} /> เลือกแล้ว</span>
+              <span style={ui.legendItem}><span style={ui.dotTaken} /> เต็ม</span>
+            </div>
           </div>
 
-          {/* ตารางคอร์ต x ชั่วโมง */}
-          <div style={ui.tableWrap}>
+          {/* ตารางคอร์ต x ชั่วโมง — ไม่มีสกรอลล์ */}
+          <div style={ui.tableFrame}>
+            {/* หัวคอลัมน์ (คงที่ด้านบน) */}
             <div style={ui.headerRow}>
-              <div style={{ ...ui.headerCell, width: 110 }}>เวลา</div>
+              <div style={{ ...ui.headerCell, width: 140, textAlign: "left" }}>ช่วงเวลา</div>
               {COURTS.map((c) => (
                 <div key={c} style={ui.headerCell}>คอร์ต {c}</div>
               ))}
             </div>
 
-            {HOURS.map((h) => (
-              <div key={h} style={ui.row}>
-                <div style={{ ...ui.timeCell }}>{formatHourLabel(h)}</div>
-                {COURTS.map((c) => {
-                  const takenCell = isTaken(c, h);
-                  const picked = isSelected(c, h);
-                  return (
-                    <button
-                      key={`${c}:${h}`}
-                      onClick={() => toggleCell(c, h)}
-                      disabled={takenCell}
-                      style={{
-                        ...ui.cellBtn,
-                        ...(takenCell ? ui.cellTaken : picked ? ui.cellPicked : {}),
-                      }}
-                      title={
-                        takenCell
-                          ? "ถูกจองแล้ว"
-                          : picked
-                          ? "เลือกรายการนี้แล้ว (คลิกเพื่อยกเลิก)"
-                          : "คลิกเพื่อเลือก"
-                      }
-                    >
-                      {takenCell ? "เต็ม" : picked ? "เลือกแล้ว" : "ว่าง"}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
+            {/* โซนบอดี้แบบ "Grid เต็มจอ" */}
+            <div
+              role="table"
+              aria-label="ตารางการจองคอร์ตแบดมินตัน"
+              style={ui.bodyNoScroll}
+            >
+              {HOURS.map((h, idx) => (
+                <div key={h} role="row" style={{ ...ui.row, ...(idx % 2 === 1 ? ui.rowAlt : null) }}>
+                  <div role="cell" style={{ ...ui.timeCell }}>{formatHourLabel(h)}</div>
+                  {COURTS.map((c) => {
+                    const takenCell = isTaken(c, h);
+                    const picked = isSelected(c, h);
+                    const label = takenCell ? "เต็ม" : picked ? "เลือกแล้ว" : "ว่าง";
+                    return (
+                      <button
+                        key={`${c}:${h}`}
+                        onClick={() => toggleCell(c, h)}
+                        disabled={takenCell}
+                        aria-pressed={picked}
+                        aria-label={`คอร์ต ${c} เวลา ${formatHourLabel(h)}: ${label}`}
+                        style={{
+                          ...ui.cellBtn,
+                          ...(takenCell ? ui.cellTaken : picked ? ui.cellPicked : ui.cellFree),
+                        }}
+                      >
+                        <span style={ui.statusPill(takenCell, picked)}>{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -279,7 +281,8 @@ export default function Details() {
   );
 }
 
-/** ===== UI styles (inline, โทนเขียวอ่อน) ===== */
+/** ===== UI styles (inline, โทนเขียวอ่อน + “เห็นครบโดยไม่ต้องเลื่อน”) ===== */
+const COLS = COURTS.length + 1; // +1 = คอลัมน์เวลา
 const ui = {
   page: {
     minHeight: "100vh",
@@ -288,28 +291,30 @@ const ui = {
     fontFamily:
       'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", sans-serif',
     padding: 16,
+    overflow: "hidden",        // ❗ กันการสกรอลล์ของทั้งหน้า
   },
   container: {
-    maxWidth: 1100,
+    maxWidth: "100vw",
     margin: "0 auto",
     display: "grid",
-    gridTemplateColumns: "1fr 320px",
+    gridTemplateColumns: "1fr 340px",
     gap: 16,
   },
 
   /* Left */
-  left: { minWidth: 0 },
+  left: { minWidth: 0, overflow: "hidden" },
   toolbar: {
     display: "flex",
     alignItems: "flex-end",
     justifyContent: "space-between",
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 10,
+    flexWrap: "wrap",
   },
-  labelSm: { display: "block", fontSize: 13, fontWeight: 700, marginBottom: 6, color: colors.muted },
+  labelSm: { display: "block", fontSize: "clamp(11px, 1vw, 13px)", fontWeight: 700, marginBottom: 6, color: colors.muted },
   badgeNote: {
     display: "inline-block",
-    fontSize: 12,
+    fontSize: "clamp(10px, .9vw, 12px)",
     padding: "6px 10px",
     borderRadius: 999,
     background: colors.primarySoft,
@@ -322,77 +327,133 @@ const ui = {
     border: `1px solid ${colors.line}`,
     borderRadius: 10,
     background: "#fff",
-    fontSize: 14,
+    fontSize: "clamp(12px, 1vw, 14px)",
     outline: "none",
   },
 
-  tableWrap: {
-    background: colors.card,
+  /* Legend */
+  legendWrap: {
+    display: "flex",
+    alignItems: "center",
+    gap: 14,
+    background: "#fff",
+    padding: "8px 12px",
+    borderRadius: 999,
     border: `1px solid ${colors.line}`,
-    borderRadius: 14,
-    boxShadow: "0 10px 30px rgba(2,6,12,0.06)",
+    boxShadow: "0 4px 18px rgba(2,6,12,.05)",
+    whiteSpace: "nowrap",
+  },
+  legendItem: { display: "inline-flex", alignItems: "center", gap: 8, fontSize: "clamp(11px, 1vw, 13px)", color: colors.muted },
+  dotFree: { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: "#fff", border: `1px solid ${colors.lineStrong}` },
+  dotPicked: { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: colors.primary, border: `1px solid ${colors.primaryDark}` },
+  dotTaken: { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: colors.taken, border: `1px solid ${colors.lineStrong}` },
+
+  /* กรอบตาราง */
+  tableFrame: {
+    background: colors.card,
+    border: `1px solid ${colors.lineStrong}`,
+    borderRadius: 16,
+    boxShadow: "0 12px 30px rgba(2,6,12,0.06)",
     overflow: "hidden",
   },
+
+  /* หัวคอลัมน์ (สูงคงที่) */
   headerRow: {
     display: "grid",
-    gridTemplateColumns: `110px repeat(${COURTS.length}, 1fr)`,
-    borderBottom: `1px solid ${colors.line}`,
+    gridTemplateColumns: `140px repeat(${COURTS.length}, 1fr)`,
+    borderBottom: `1px solid ${colors.lineStrong}`,
     background: colors.primarySoft,
+    boxShadow: "inset 0 -1px 0 " + colors.lineStrong,
   },
   headerCell: {
-    padding: "10px 8px",
-    fontSize: 13,
-    fontWeight: 800,
+    padding: "12px 10px",
+    fontSize: "clamp(11px, 1vw, 13px)",
+    fontWeight: 900,
     textAlign: "center",
-    borderLeft: `1px solid ${colors.line}`,
+    borderLeft: `1px solid ${colors.lineStrong}`,
     color: colors.primaryDark,
+    letterSpacing: 0.2,
   },
+
+  /* โซนบอดี้ “ไม่มีสกรอลล์”: แบ่งแถวเป็น 12 ส่วนเท่า ๆ กัน ให้สูงรวม = (100vh - OFFSET) */
+  bodyNoScroll: {
+    height: `calc(100vh - ${OFFSET_PX}px)`, // ✅ ปรับ OFFSET_PX ได้ถ้ายังไม่พอดี
+    display: "grid",
+    gridAutoFlow: "row",
+    gridTemplateRows: `repeat(${HOURS.length}, 1fr)`, // 12 แถวเท่ากัน
+    overflow: "hidden",
+  },
+
+  /* แถว */
   row: {
     display: "grid",
-    gridTemplateColumns: `110px repeat(${COURTS.length}, 1fr)`,
+    gridTemplateColumns: `140px repeat(${COURTS.length}, 1fr)`,
     borderTop: `1px solid ${colors.line}`,
   },
+  rowAlt: { background: "#fbfdfc" },
+
+  /* คอลัมน์เวลา (ซ้าย) */
   timeCell: {
-    padding: "10px 8px",
-    fontSize: 12,
+    padding: "0 10px",
+    display: "flex",
+    alignItems: "center",
+    fontSize: "clamp(11px, .95vw, 13px)",
     textAlign: "left",
-    background: "#fbfdfc",
-    borderRight: `1px solid ${colors.line}`,
+    background: "#ffffff",
+    borderRight: `1px solid ${colors.lineStrong}`,
+    fontWeight: 700,
   },
+
+  /* เซลล์สถานะ */
   cellBtn: {
-    padding: "10px 6px",
-    fontSize: 12,
+    width: "100%",
+    height: "100%",
+    fontSize: "clamp(11px, .95vw, 13px)",
     background: "#fff",
     border: "none",
     borderLeft: `1px solid ${colors.line}`,
     cursor: "pointer",
-    transition: "transform .05s ease",
+    transition: "transform .06s ease, box-shadow .12s ease, background .12s ease",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    outline: "none",
   },
-  // ✅ สีตอนเลือก: เขียวอ่อน + เส้นขอบเขียว
+  cellFree: { background: "#fff" },
   cellPicked: {
     background: colors.primarySoft,
-    outline: `2px solid ${colors.primary}`,
-    outlineOffset: -2,
-    fontWeight: 800,
-    transform: "scale(0.995)",
+    boxShadow: "inset 0 0 0 2px " + colors.primary,
   },
-  // ❌ สีช่องที่ถูกจองแล้ว
   cellTaken: {
     background: colors.taken,
     color: "#9ca3af",
     cursor: "not-allowed",
   },
 
+  // แคปซูลสถานะในเซลล์
+  statusPill: (isTaken, isPicked) => ({
+    fontSize: "clamp(10px, .9vw, 12px)",
+    fontWeight: 800,
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: `1px solid ${isTaken ? colors.lineStrong : isPicked ? colors.primaryDark : colors.lineStrong}`,
+    background: isTaken ? "#f1f5f9" : isPicked ? "#dcfce7" : "#ffffff",
+    color: isTaken ? "#94a3b8" : isPicked ? colors.success : colors.ink,
+    letterSpacing: 0.2,
+  }),
+
   /* Right */
-  right: { minWidth: 0 },
+  right: { minWidth: 0, overflow: "hidden" },
   card: {
     background: colors.card,
     border: `1px solid ${colors.line}`,
-    borderRadius: 14,
-    boxShadow: "0 10px 30px rgba(2,6,12,0.06)",
-    padding: 12,
+    borderRadius: 16,
+    boxShadow: "0 12px 30px rgba(2,6,12,0.06)",
+    padding: 14,
     position: "sticky",
     top: 16,
+    maxHeight: "calc(100vh - 32px)",
+    overflow: "auto", // ให้การ์ดฝั่งขวาเลื่อนเองถ้าสูงเกิน
   },
   cardTitle: { margin: 0, fontSize: 18, fontWeight: 900, color: colors.primaryDark },
   summaryRow: {
@@ -405,7 +466,7 @@ const ui = {
   textarea: {
     width: "100%",
     padding: "10px 14px",
-    borderRadius: 10,
+    borderRadius: 12,
     border: `1px solid ${colors.line}`,
     outline: "none",
     fontSize: 14,

@@ -72,13 +72,23 @@ const profileSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
     avatar: { type: String, default: "" }, // เก็บ URL รูป (เช่น /uploads/xxx.png หรือ Cloudinary)
-    bio: { type: String, default: "" },
   },
   { timestamps: true, collection: "profiles" }
 );
 
 const Profile = mongoose.model("Profile", profileSchema);
 
+// ---------- Multer Config ----------
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
+  filename: (req, file, cb) => {
+    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, unique + path.extname(file.originalname));
+  },
+});
+const upload = multer({ storage });
 
 
 // ---------- Routes ----------
@@ -272,21 +282,10 @@ app.get("/api/bookings/my/:userId", async (req, res) => {
 });
 
 
-// ---------- Multer Config ----------
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/"); // โฟลเดอร์เก็บไฟล์
-  },
-  filename: (req, file, cb) => {
-    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, unique + path.extname(file.originalname)); // ชื่อไฟล์ใหม่
-  },
-});
+const path = require("path");
+const multer = require("multer");
 
-const upload = multer({ storage });
 
-// ทำ static route ให้เข้าถึงไฟล์ได้
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ---------- Upload Avatar ----------
 app.post("/api/profile/:userId/avatar", upload.single("avatar"), async (req, res) => {
@@ -296,19 +295,21 @@ app.post("/api/profile/:userId/avatar", upload.single("avatar"), async (req, res
 
     const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
 
-    let profile = await Profile.findOneAndUpdate(
+    const profile = await Profile.findOneAndUpdate(
       { user: userId },
       { avatar: fileUrl },
       { new: true, upsert: true }
     );
 
-    res.json({ message: "อัพโหลดรูปเรียบร้อย", avatar: fileUrl, profile });
+    res.json({ message: "อัพโหลดสำเร็จ", avatar: fileUrl, profile });
   } catch (err) {
-    console.error("❌ Upload error:", err.message);
+    console.error("Upload error:", err.message);
     res.status(500).json({ error: "Server error" });
   }
 });
 
+// ---------- Static for uploads ----------
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 
 
