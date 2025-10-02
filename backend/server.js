@@ -152,6 +152,33 @@ app.get("/api/users/:id", async (req, res) => {
   }
 });
 
+// ✏️ Update user by id
+app.put("/api/users/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, phone } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "ID ไม่ถูกต้อง (ต้องเป็น ObjectId)" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { name, phone },
+      { new: true, runValidators: true, projection: { password: 0 } }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: "ไม่พบผู้ใช้" });
+    }
+
+    res.json({ message: "อัพเดตข้อมูลเรียบร้อยแล้ว", user });
+  } catch (err) {
+    console.error("❌ Update user error:", err.message);
+    res.status(500).json({ error: "Server error", detail: err.message });
+  }
+});
+
 
 
 
