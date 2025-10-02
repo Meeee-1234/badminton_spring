@@ -5,18 +5,31 @@ const API = "https://badminton-hzwm.onrender.com";
 
 export default function Profile() {
   const navigate = useNavigate();
-  const [user, setUser] = useState({ name: "", email: "", phone: "" }); // เก็บค่าจริง
-  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "" }); // สำหรับแก้ไข
+  const [user, setUser] = useState({ name: "", email: "", phone: "" });
+  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "" });
+  const [avatar, setAvatar] = useState("");   // ✅ รูปโปรไฟล์
+  const [bio, setBio] = useState("");         // ✅ bio
   const [message, setMessage] = useState("");
   const [userId, setUserId] = useState(null);
 
-  // โหลดข้อมูล user จาก localStorage
+  // โหลด user + profile
   useEffect(() => {
     const u = JSON.parse(localStorage.getItem("auth:user") || "{}");
     if (u?._id) {
       setUserId(u._id);
       setUser({ name: u.name, email: u.email, phone: u.phone });
       setEditForm({ name: u.name, email: u.email, phone: u.phone });
+
+      // โหลด profile เพิ่มเติม
+      fetch(`${API}/api/profile/${u._id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (!data.error) {
+            setAvatar(data.avatar || "");
+            setBio(data.bio || "");
+          }
+        })
+        .catch(() => {});
     }
   }, []);
 
@@ -24,6 +37,7 @@ export default function Profile() {
     setEditForm({ ...editForm, [e.target.name]: e.target.value });
   };
 
+  // ✅ save user info
   const handleSave = async (e) => {
     e.preventDefault();
     setMessage("⏳ กำลังบันทึก...");
@@ -41,13 +55,33 @@ export default function Profile() {
       const data = await res.json();
       if (res.ok) {
         setMessage("✅ อัพเดตข้อมูลสำเร็จ");
-        setUser({ ...user, name: data.user.name, phone: data.user.phone }); // sync user จริง
+        setUser({ ...user, name: data.user.name, phone: data.user.phone });
         localStorage.setItem("auth:user", JSON.stringify(data.user));
       } else {
         setMessage(`❌ ${data.error || "อัพเดตไม่สำเร็จ"}`);
       }
     } catch (err) {
       console.error("Update error:", err);
+      setMessage("❌ Server error");
+    }
+  };
+
+  // ✅ save profile info (avatar + bio)
+  const handleProfileSave = async () => {
+    setMessage("⏳ กำลังบันทึกโปรไฟล์...");
+    try {
+      const res = await fetch(`${API}/api/profile/${userId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avatar, bio }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage("✅ บันทึกโปรไฟล์แล้ว");
+      } else {
+        setMessage(`❌ ${data.error || "บันทึกไม่สำเร็จ"}`);
+      }
+    } catch (err) {
       setMessage("❌ Server error");
     }
   };
@@ -104,7 +138,7 @@ export default function Profile() {
               marginRight: "auto",
             }}
           >
-            จัดการข้อมูลบัญชีของคุณ และอัปเดตเบอร์ติดต่อเพื่อการจองที่รวดเร็วขึ้น
+            จัดการข้อมูลบัญชีของคุณ เพิ่มรูปโปรไฟล์ และอัปเดตเบอร์ติดต่อเพื่อการจองที่รวดเร็วขึ้น
           </p>
         </div>
       </section>
@@ -121,51 +155,41 @@ export default function Profile() {
                 background: "white",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                 padding: "24px",
+                textAlign: "center",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                <div
-                  style={{
-                    height: "56px",
-                    width: "56px",
-                    borderRadius: "50%",
-                    background: "#d1fae5",
-                    color: "#065f46",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: "800",
-                    fontSize: "18px",
-                  }}
-                >
-                  {user.name?.[0] || "U"}
-                </div>
-                <div>
-                  <div style={{ fontSize: "20px", fontWeight: "700", color: "#111827" }}>
-                    {user.name}
+              <div>
+                {avatar ? (
+                  <img
+                    src={avatar}
+                    alt="avatar"
+                    style={{ width: "80px", height: "80px", borderRadius: "50%", margin: "auto" }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      height: "80px",
+                      width: "80px",
+                      borderRadius: "50%",
+                      background: "#d1fae5",
+                      color: "#065f46",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontWeight: "800",
+                      fontSize: "24px",
+                      margin: "auto",
+                    }}
+                  >
+                    {user.name?.[0] || "U"}
                   </div>
-                  <div style={{ fontSize: "14px", color: "#6b7280" }}>{user.email}</div>
-                </div>
+                )}
               </div>
-
-              <div
-                style={{
-                  marginTop: "24px",
-                  fontSize: "14px",
-                  borderTop: "1px solid #e5e7eb",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "12px 0",
-                    display: "flex",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <span style={{ color: "#6b7280" }}>Phone</span>
-                  <span style={{ fontWeight: "500", color: "#111827" }}>{user.phone}</span>
-                </div>
+              <div style={{ marginTop: "12px", fontSize: "20px", fontWeight: "700", color: "#111827" }}>
+                {user.name}
               </div>
+              <div style={{ fontSize: "14px", color: "#6b7280" }}>{user.email}</div>
+              <div style={{ marginTop: "12px", fontSize: "14px", color: "#374151" }}>{bio}</div>
 
               <div style={{ marginTop: "24px" }}>
                 <button
@@ -181,8 +205,6 @@ export default function Profile() {
                     cursor: "pointer",
                     boxShadow: "0 4px 8px rgba(220,38,38,0.3)",
                   }}
-                  onMouseOver={(e) => (e.target.style.background = "#b91c1c")}
-                  onMouseOut={(e) => (e.target.style.background = "#dc2626")}
                 >
                   Logout
                 </button>
@@ -202,107 +224,85 @@ export default function Profile() {
                 padding: "24px",
               }}
             >
-              <h2
-                style={{
-                  fontSize: "20px",
-                  fontWeight: "700",
-                  color: "#065f46",
-                  marginBottom: "16px",
-                }}
-              >
-                แก้ไขข้อมูล
+              <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#065f46", marginBottom: "16px" }}>
+                แก้ไขข้อมูลบัญชี
               </h2>
 
               <div style={{ display: "grid", gap: "20px" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "14px", marginBottom: "6px" }}>
-                    Username
-                  </label>
+                  <label>Username</label>
                   <input
                     type="text"
                     name="name"
                     value={editForm.name}
                     onChange={handleChange}
-                    style={{
-                      width: "100%",
-                      borderRadius: "8px",
-                      border: "1px solid #d1d5db",
-                      padding: "12px",
-                      outline: "none",
-                      fontSize: "14px",
-                    }}
+                    style={{ width: "100%", padding: "10px" }}
                   />
                 </div>
-
                 <div>
-                  <label style={{ display: "block", fontSize: "14px", marginBottom: "6px" }}>
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={editForm.email}
-                    readOnly
-                    style={{
-                      width: "100%",
-                      borderRadius: "8px",
-                      border: "1px solid #d1d5db",
-                      padding: "12px",
-                      background: "#f9fafb",
-                      color: "#6b7280",
-                      fontSize: "14px",
-                    }}
-                  />
+                  <label>Email</label>
+                  <input type="email" value={editForm.email} readOnly style={{ width: "100%", padding: "10px" }} />
                 </div>
-
                 <div>
-                  <label style={{ display: "block", fontSize: "14px", marginBottom: "6px" }}>
-                    Phone
-                  </label>
+                  <label>Phone</label>
                   <input
                     type="tel"
                     name="phone"
                     value={editForm.phone}
                     onChange={handleChange}
-                    style={{
-                      width: "100%",
-                      borderRadius: "8px",
-                      border: "1px solid #d1d5db",
-                      padding: "12px",
-                      outline: "none",
-                      fontSize: "14px",
-                    }}
+                    style={{ width: "100%", padding: "10px" }}
                   />
                 </div>
               </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginTop: "24px",
-                }}
-              >
-                <span style={{ fontSize: "14px" }}>{message}</span>
-                <button
-                  type="submit"
-                  style={{
-                    borderRadius: "12px",
-                    background: "#059669",
-                    color: "white",
-                    padding: "12px 20px",
-                    fontWeight: "600",
-                    border: "none",
-                    cursor: "pointer",
-                    boxShadow: "0 4px 8px rgba(16,185,129,0.3)",
-                  }}
-                  onMouseOver={(e) => (e.target.style.background = "#047857")}
-                  onMouseOut={(e) => (e.target.style.background = "#059669")}
-                >
-                  Save changes
-                </button>
-              </div>
+              <button type="submit" style={{ marginTop: "20px", padding: "10px 20px", background: "#059669", color: "#fff", border: "none", borderRadius: "8px" }}>
+                Save changes
+              </button>
             </form>
+
+            {/* ✅ Profile form */}
+            <div
+              style={{
+                borderRadius: "16px",
+                border: "1px solid #e5e7eb",
+                background: "white",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                padding: "24px",
+                marginTop: "20px",
+              }}
+            >
+              <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#065f46", marginBottom: "16px" }}>
+                โปรไฟล์เพิ่มเติม
+              </h2>
+
+              <div style={{ marginBottom: "12px" }}>
+                <label>Profile Image URL</label>
+                <input
+                  type="text"
+                  value={avatar}
+                  onChange={(e) => setAvatar(e.target.value)}
+                  placeholder="เช่น https://..."
+                  style={{ width: "100%", padding: "10px", marginTop: "6px" }}
+                />
+                {avatar && <img src={avatar} alt="preview" style={{ marginTop: "10px", width: "100px", borderRadius: "50%" }} />}
+              </div>
+
+              <div style={{ marginBottom: "12px" }}>
+                <label>Bio</label>
+                <textarea
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  rows={3}
+                  style={{ width: "100%", padding: "10px", marginTop: "6px" }}
+                />
+              </div>
+
+              <button type="button" onClick={handleProfileSave} style={{ padding: "10px 20px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: "8px" }}>
+                Save Profile
+              </button>
+            </div>
+
+            {message && <p style={{ marginTop: "10px", color: "#374151" }}>{message}</p>}
           </main>
         </div>
       </section>
