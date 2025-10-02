@@ -31,141 +31,103 @@ const colors = {
   success: "#16a34a",
 };
 
-function toDateKey(d) {
-  const dt = new Date(d);
-  const y = dt.getFullYear();
-  const m = String(dt.getMonth() + 1).padStart(2, "0");
-  const day = String(dt.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function formatHourLabel(h) {
-  const pad = (x) => String(x).padStart(2, "0");
-  return `${pad(h)}:00–${pad(h + 1)}:00`;
-}
-
-// แปลง taken array เช่น ["1:9","2:10"] -> { 1:[9], 2:[10] }
-const normalizeTakenToMap = (taken = []) => {
-  const map = {};
-  for (const key of taken) {
-    const [c, h] = String(key).split(":").map(Number);
-    if (!Number.isFinite(c) || !Number.isFinite(h)) continue;
-    (map[c] ??= []).push(h);
-  }
-  return map;
-};
-
 export default function Details() {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  // รับ date จาก state หรือ query
-  const search = new URLSearchParams(location.search);
-  const stateDate = location.state?.date || location.state?.dateKey;
-  const initDate = stateDate || search.get("date") || toDateKey(new Date());
-
-  const [dateKey, setDateKey] = useState(initDate);
-  const [takenMap, setTakenMap] = useState({}); // { courtId: [hours] }
-  const [selected, setSelected] = useState([]); // [{ court, hour }]
+  
+  const [dateKey, setDateKey] = useState(() => {
+    const today = new Date().toISOString().split("T")[0];
+    return today;
+  });
+  const [taken, setTaken] = useState([]); // ["1:9","2:10"]
+  const [selected, setSelected] = useState([]); // [{court, hour}]
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
-  // ผู้ใช้ที่ล็อกอิน
-  const authUser = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("auth:user") || "null");
-    } catch {
-      return null;
-    }
-  }, []);
-
-  // โหลดคิวที่ถูกจองแล้วของวันนั้น
-  const fetchTaken = async (d) => {
-    setMsg("");
-    try {
-      const res = await fetch(ENDPOINTS.taken(d), { cache: "no-store" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setTakenMap({});
-        setMsg(data?.error ? `❌ ${data.error}` : "❌ โหลดตารางไม่สำเร็จ");
-        return;
-      }
-      const map = normalizeTakenToMap(data?.taken || []);
-      setTakenMap(map);
-    } catch {
-      setTakenMap({});
-      setMsg("❌ Server error (โหลดตารางไม่สำเร็จ)");
-    }
-  };
-
-  useEffect(() => {
-    fetchTaken(dateKey);
-    setSelected([]); // เปลี่ยนวัน ให้ล้างที่เลือก
-  }, [dateKey]);
-
-  const isTaken = (court, hour) => (takenMap[court] || []).includes(hour);
-  const isSelected = (court, hour) => selected.some((s) => s.court === court && s.hour === hour);
-
-  const toggleCell = (court, hour) => {
-    if (isTaken(court, hour)) return; // ห้ามเลือกซ้ำคิวที่ถูกจองแล้ว
-    setSelected((prev) => {
-      const idx = prev.findIndex((s) => s.court === court && s.hour === hour);
-      if (idx >= 0) {
-        const cp = prev.slice();
-        cp.splice(idx, 1);
-        return cp;
-      }
-      return [...prev, { court, hour }];
-    });
-  };
-
   const totalHours = selected.length;
   const totalPrice = totalHours * PRICE_PER_HOUR;
 
-  const handleConfirm = async () => {
-    setMsg("");
-    if (!authUser?.email) {
-      setMsg("❌ กรุณาเข้าสู่ระบบก่อนทำการจอง");
-      return;
-    }
-    if (!selected.length) {
-      setMsg("❌ กรุณาเลือกคอร์ตและช่วงเวลาอย่างน้อย 1 รายการ");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await fetch(ENDPOINTS.create, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: authUser.email,
-          date: dateKey,
-          selections: selected.map((s) => ({ court: s.court, hour: s.hour })),
-          note,
-        }),
+  // โหลดรายการที่ถูกจองแล้วจาก backend
+  useEffect(() => {
+    fetch(ENDPOINTS.taken(dateKey))
+      .then((res) => res.json())
+      .then((data) => {
+        setTaken(data.taken || []);
+      })
+      .catch((err) => {
+        console.error("Load taken error:", err);
       });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setMsg("✅ จองสำเร็จ");
-        // รีโหลดตารางวันนั้น และล้างที่เลือก
-        await fetchTaken(dateKey);
-        setSelected([]);
-        setNote("");
-        // กลับหน้าแรกหรือไปหน้าประวัติการจองตามต้องการ
-        setTimeout(() => navigate("/"), 800);
-      } else {
-        setMsg(`❌ ${data?.error || "จองไม่สำเร็จ"}`);
+  }, [dateKey]);
+
+  // helper: แปลงเป็น label เช่น 9 => "09:00-10:00"
+  const formatHourLabel = (h) => `${h.toString().padStart(2, "0")}:00 - ${h + 1}:00`;
+
+  // helper: เช็คว่าเวลานี้ถูกจองหรือยัง
+  const isTaken = (c, h) => taken.includes(`${c}:${h}`);
+
+  // helper: เช็คว่า user เลือกไปแล้วหรือยัง
+  const isSelected = (c, h) => selected.some((s) => s.court === c && s.hour === h);
+
+  // toggle เลือก/ยกเลิก
+  const toggleCell = (c, h) => {
+    if (isTaken(c, h)) return;
+    if (isSelected(c, h)) {
+      setSelected(selected.filter((s) => !(s.court === c && s.hour === h)));
+    } else {
+      setSelected([...selected, { court: c, hour: h }]);
+    }
+  };
+
+  // ✅ กดปุ่มยืนยันการจอง
+  const handleConfirm = async () => {
+    setLoading(true);
+    setMsg("");
+
+    try {
+      const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
+      if (!user?._id) {
+        setMsg("❌ กรุณาเข้าสู่ระบบก่อนจอง");
+        setLoading(false);
+        return;
       }
-    } catch {
-      setMsg("❌ Server error (จองไม่สำเร็จ)");
+
+      // ส่งแต่ละ booking ไป backend
+      for (const s of selected) {
+        const res = await fetch(ENDPOINTS.create, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: user._id,
+            date: dateKey,
+            court: s.court,
+            hour: s.hour,
+            note,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          setMsg(`❌ จองคอร์ต ${s.court} เวลา ${formatHourLabel(s.hour)} ไม่สำเร็จ: ${data.error}`);
+          setLoading(false);
+          return;
+        }
+      }
+
+      setMsg("✅ จองสำเร็จ!");
+      setSelected([]);
+      setNote("");
+
+      // reload ตาราง
+      const res2 = await fetch(ENDPOINTS.taken(dateKey));
+      const data2 = await res2.json();
+      setTaken(data2.taken || []);
+
+    } catch (err) {
+      console.error("Booking error:", err);
+      setMsg("❌ Server error");
     } finally {
       setLoading(false);
     }
   };
-
-  // ป้องกันคีย์ที่ไม่ใช่ตัวเลขในช่อง phone/time? (ไม่ได้ใช้ในหน้านี้)
 
   return (
     <div style={ui.page}>

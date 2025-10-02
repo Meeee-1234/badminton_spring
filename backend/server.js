@@ -33,6 +33,7 @@ mongoose
   })
   .catch((err) => console.error("❌ MongoDB error:", err.message));
 
+
 // ---------- User Schema ----------
 const userSchema = new mongoose.Schema(
   {
@@ -45,6 +46,21 @@ const userSchema = new mongoose.Schema(
 );
 
 const User = mongoose.model("User", userSchema);
+
+
+// ---------- Booking Schema ----------
+const bookingSchema = new mongoose.Schema(
+  {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    date: { type: String, required: true }, // YYYY-MM-DD
+    court: { type: Number, required: true }, // คอร์ต 1-6
+    hour: { type: Number, required: true },  // ชั่วโมง เช่น 9 = 9:00-10:00
+    note: { type: String },
+  },
+  { timestamps: true, collection: "bookings" }
+);
+
+const Booking = mongoose.model("Booking", bookingSchema);
 
 // ---------- Routes ----------
 app.get("/", (req, res) => {
@@ -181,6 +197,60 @@ app.put("/api/users/:id", async (req, res) => {
 
 
 
+// ---------- Booking Routes ----------
+
+// ✅ ดูช่วงเวลาที่ถูกจองแล้ว
+app.get("/api/bookings/taken", async (req, res) => {
+  try {
+    const { date } = req.query;
+    if (!date) return res.status(400).json({ error: "ต้องส่ง date" });
+
+    const bookings = await Booking.find({ date });
+    const taken = bookings.map((b) => `${b.court}:${b.hour}`);
+    res.json({ taken });
+  } catch (err) {
+    console.error("❌ Get taken error:", err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ✅ จองสนามใหม่
+app.post("/api/bookings", async (req, res) => {
+  try {
+    const { userId, date, court, hour, note } = req.body;
+    if (!userId || !date || court == null || hour == null) {
+      return res.status(400).json({ error: "ต้องส่ง userId, date, court, hour" });
+    }
+
+
+    // กันไม่ให้ซ้ำ
+    const exists = await Booking.findOne({ date, court, hour });
+    if (exists) {
+      return res.status(409).json({ error: "ช่วงเวลานี้ถูกจองแล้ว" });
+    }
+
+    const booking = await Booking.create({ user: userId, date, court, hour, note });
+    res.status(201).json({ message: "จองสำเร็จ", booking });
+  } catch (err) {
+    console.error("❌ Booking error:", err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ✅ ดูการจองของ user
+app.get("/api/bookings/my/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const myBookings = await Booking.find({ user: userId })
+      .populate("user", "name email")
+      .sort({ date: 1, hour: 1 });
+
+    res.json(myBookings);
+  } catch (err) {
+    console.error("❌ My bookings error:", err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 
 
