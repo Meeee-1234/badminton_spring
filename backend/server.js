@@ -44,7 +44,7 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, required: true },
     password: { type: String, required: true }, // hash password
     role: { type: String, enum: ["user", "admin"], default: "user" },
-    isDeleted: { type: Boolean, default: false },
+    isDeleted: { type: Boolean, default: false }
   },
   { timestamps: true, collection: "users" }
 );
@@ -105,13 +105,12 @@ function isAdmin(req, res, next) {
 // ---------- Admin Routes ----------
 app.get("/api/admin/users", isAdmin, async (req, res) => {
   try {
-    const users = await User.find({ isDeleted: false }).select("-password");
+    const users = await User.find().select("-password");
     res.json({ users });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch users" });
   }
 });
-
 
 app.get("/api/admin/bookings", isAdmin, async (req, res) => {
   try {
@@ -129,31 +128,6 @@ app.get("/api/admin/bookings", isAdmin, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch bookings" });
   }
 });
-
-
-app.delete("/api/admin/users/:id", isAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ error: "ID ไม่ถูกต้อง" });
-    }
-
-    const user = await User.findByIdAndUpdate(
-      id,
-      { isDeleted: true }, // ✅ mark เป็นลบ
-      { new: true }
-    );
-
-    if (!user) return res.status(404).json({ error: "ไม่พบผู้ใช้" });
-
-    res.json({ message: "ปิดการใช้งานบัญชีเรียบร้อยแล้ว (Soft Delete)", user });
-  } catch (err) {
-    console.error("❌ Soft delete error:", err.message);
-    res.status(500).json({ error: "Server error", detail: err.message });
-  }
-});
-
 
 
 

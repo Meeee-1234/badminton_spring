@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
+const API = process.env.REACT_APP_API_URL || "https://badminton-mongo.vercel.app";
 
 export default function AdminManagement() {
   const [users, setUsers] = useState([]);
@@ -228,3 +228,4 @@ const handleDeleteUser = async (id) => {
     </div>
   );
 }
+ 
