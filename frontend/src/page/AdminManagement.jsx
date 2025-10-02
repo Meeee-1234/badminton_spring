@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API = process.env.REACT_APP_API_URL || "https://badminton-mongo.vercel.app";
+//const API = process.env.REACT_APP_API_URL || "https://badminton-mongo.vercel.app";
+const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
+
 
 export default function AdminManagement() {
   const [users, setUsers] = useState([]);
@@ -28,16 +30,27 @@ const handleDeleteUser = async (id) => {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    const data = await res.json();   // ✅ อ่านข้อความจาก backend
+    // 👀 Debug: อ่าน response เป็น text ก่อน
+    const text = await res.text();
+    console.log("📌 Raw response:", text);
+
+    let data;
+    try {
+      data = JSON.parse(text); // แปลงเป็น JSON ถ้าเป็น JSON จริง
+    } catch (err) {
+      throw new Error("Response is not JSON: " + text.substring(0, 100));
+    }
+
     if (!res.ok) throw new Error(data.error || "ลบผู้ใช้ไม่สำเร็จ");
 
     setUsers(users.filter((u) => u._id !== id));
     alert("✅ " + data.message);
   } catch (err) {
-    console.error(err);
+    console.error("❌ Delete user error:", err);
     alert("❌ " + err.message);
   }
 };
+
 
   useEffect(() => {
     const token = localStorage.getItem("auth:token");

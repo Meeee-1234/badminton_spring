@@ -1,4 +1,4 @@
-// src/page/Details.jsx
+// src/Details.jsx
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -6,11 +6,12 @@ const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.co
 
 /** ===== CONFIG ===== */
 const OPEN_HOUR = 9;
-const CLOSE_HOUR = 21;
+const CLOSE_HOUR = 21; // ช่องสุดท้าย 20:00–21:00
 const HOURS = Array.from({ length: CLOSE_HOUR - OPEN_HOUR }, (_, i) => OPEN_HOUR + i);
 const COURTS = [1, 2, 3, 4, 5, 6];
 const PRICE_PER_HOUR = 120;
 
+/** THEME (โทนเขียวอ่อน) */
 const colors = {
   primary: "#34d399",
   primaryDark: "#10b981",
@@ -27,9 +28,10 @@ const colors = {
   taken: "#eef2f4",
 };
 
+/** เปลี่ยนเส้นทาง API ให้ตรงกับระบบคุณ */
 const ENDPOINTS = {
   taken: (date) => `${API}/api/bookings/taken?date=${encodeURIComponent(date)}`,
-  mine: (date, userId) => `${API}/api/bookings/mine?date=${encodeURIComponent(date)}&userId=${encodeURIComponent(userId)}`,
+  mine:  (date, userId) => `${API}/api/bookings/mine?date=${encodeURIComponent(date)}&userId=${encodeURIComponent(userId)}`,
   create: `${API}/api/bookings`,
 };
 
@@ -45,18 +47,21 @@ const msUntilNextMidnight = () => {
 export default function Details() {
   const navigate = useNavigate();
 
+  // 🔒 วัน “วันนี้” อัตโนมัติ
   const [dateKey, setDateKey] = useState(() => toDateKey());
-  const [taken, setTaken] = useState([]);
-  const [mine, setMine] = useState([]);
-  const [selected, setSelected] = useState([]);
+  const [taken, setTaken] = useState([]);       // ["1:9","2:10"]
+  const [mine, setMine]   = useState([]);       // ["1:9","2:10"] ของผู้ใช้
+  const [selected, setSelected] = useState([]); // [{court, hour}]
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
+  // ✅ สเกลอัตโนมัติให้ “พอดีจอ”
   const [scale, setScale] = useState(1);
   const viewportRef = useRef(null);
   const contentRef = useRef(null);
 
+  // คำนวณ scale เมื่อโหลด/เปลี่ยนขนาดหน้าต่าง/เนื้อหา
   useLayoutEffect(() => {
     const calc = () => {
       const ct = contentRef.current;
@@ -99,6 +104,7 @@ export default function Details() {
     };
   }, []);
 
+  // อัปเดตเป็นวันใหม่อัตโนมัติเที่ยงคืน
   useEffect(() => {
     const tick = () => {
       const today = toDateKey();
@@ -119,6 +125,7 @@ export default function Details() {
     };
   }, []);
 
+  // โหลดสถานะจอง (รวม “ของฉัน”)
   useEffect(() => {
     let cancelled = false;
 
@@ -138,7 +145,7 @@ export default function Details() {
             const mJson = await mRes.json();
             if (!cancelled) setMine(mJson.mine || []);
           } catch {
-            if (!cancelled) setMine([]);
+            if (!cancelled) setMine([]); // fallback ถ้ายังไม่มี endpoint
           }
         } else {
           if (!cancelled) setMine([]);
@@ -154,11 +161,11 @@ export default function Details() {
 
   const formatHourLabel = (h) => `${h.toString().padStart(2, "0")}:00 - ${h + 1}:00`;
   const isTaken = (c, h) => taken.includes(`${c}:${h}`);
-  const isMine = (c, h) => mine.includes(`${c}:${h}`);
+  const isMine  = (c, h) => mine.includes(`${c}:${h}`);
   const isSelected = (c, h) => selected.some((s) => s.court === c && s.hour === h);
 
   const toggleCell = (c, h) => {
-    if (isTaken(c, h) && !isMine(c, h)) return;
+    if (isTaken(c, h)) return; // ช่องจองแล้วคลิกไม่ได้
     setSelected((prev) =>
       prev.some((s) => s.court === c && s.hour === h)
         ? prev.filter((s) => !(s.court === c && s.hour === h))
@@ -225,14 +232,20 @@ export default function Details() {
     }
   };
 
+  
+
+  
+
   const goHome = () => {
     try { navigate("/"); } catch { window.location.href = "/"; }
   };
 
   return (
     <div ref={viewportRef} style={ui.page}>
+      {/* ✅ ตัวคอนเทนต์จริง — จะถูกสเกลให้พอดีจออัตโนมัติ */}
       <div ref={contentRef} style={ui.contentWrap}>
         <div style={ui.container}>
+          {/* ซ้าย: ตาราง */}
           <section style={ui.left}>
             <div style={ui.toolbar}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -250,144 +263,389 @@ export default function Details() {
                     title="ระบบจะอัปเดตเป็นวันใหม่โดยอัตโนมัติทุกเที่ยงคืน"
                     style={{ ...ui.dateInput, background: colors.primarySoft, borderColor: colors.primary }}
                   />
+                  <span style={ui.badgeNote}>ตาราง “วันนี้” • อัปเดตอัตโนมัติเที่ยงคืน</span>
                 </div>
               </div>
+
+              {/* Legend สถานะ */}
+              <div style={ui.legendWrap} aria-hidden>
+                <span style={ui.legendItem}><span style={ui.dotMine} /> ของฉัน</span>
+                <span style={ui.legendItem}><span style={ui.dotPicked} /> เลือกแล้ว</span>
+                <span style={ui.legendItem}><span style={ui.dotFree} /> ว่าง</span>
+                <span style={ui.legendItem}><span style={ui.dotTaken} /> เต็ม</span>
+              </div>
             </div>
-            <table style={ui.table}>
-              <thead>
-                <tr>
-                  <th>เวลา\คอร์ท</th>
-                  {COURTS.map((c) => <th key={c}>คอร์ท {c}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {HOURS.map((h) => (
-                  <tr key={h}>
-                    <td style={ui.hourCell}>{formatHourLabel(h)}</td>
+
+            {/* ตารางคอร์ต x ชั่วโมง */}
+            <div style={ui.tableFrame}>
+              <div style={ui.headerRow}>
+                <div style={{ ...ui.headerCell, width: 140, textAlign: "left" }}>ช่วงเวลา</div>
+                {COURTS.map((c) => (
+                  <div key={c} style={ui.headerCell}>คอร์ต {c}</div>
+                ))}
+              </div>
+
+              <div role="table" aria-label="ตารางการจองคอร์ตแบดมินตัน" style={ui.bodyGrid}>
+                {HOURS.map((h, idx) => (
+                  <div key={h} role="row" style={{ ...ui.row, ...(idx % 2 === 1 ? ui.rowAlt : null) }}>
+                    <div role="cell" style={{ ...ui.timeCell }}>{formatHourLabel(h)}</div>
                     {COURTS.map((c) => {
-                      const takenStatus = isTaken(c, h);
-                      const mineStatus = isMine(c, h);
-                      const selStatus = isSelected(c, h);
-                      let bg = colors.bg;
-                      if (mineStatus) bg = colors.accent;
-                      else if (takenStatus) bg = colors.taken;
-                      else if (selStatus) bg = colors.primarySoft;
+                      const takenCell = isTaken(c, h);
+                      const mineCell  = isMine(c, h);
+                      const picked    = isSelected(c, h);
+
+                      const label = takenCell ? (mineCell ? "ของฉัน" : "เต็ม") : (picked ? "เลือกแล้ว" : "ว่าง");
+                      const styleForCell =
+                        takenCell ? (mineCell ? ui.cellMine : ui.cellTaken)
+                                  : (picked ? ui.cellPicked : ui.cellFree);
+
+                      // ✅ ของฉัน: ไม่ใช้ disabled จริง เพื่อไม่ให้ซีด แต่กันกดด้วย pointerEvents
+                      const commonBtnStyle = { ...ui.cellBtn, ...styleForCell };
+                      const btnProps = mineCell
+                        ? { disabled: false, "aria-disabled": true, style: { ...commonBtnStyle, ...ui.mineNoDim } }
+                        : { disabled: takenCell, style: commonBtnStyle };
+
                       return (
-                        <td
-                          key={c}
-                          style={{
-                            ...ui.cell,
-                            backgroundColor: bg,
-                            cursor: takenStatus && !mineStatus ? "not-allowed" : "pointer",
-                          }}
+                        <button
+                          key={`${c}:${h}`}
                           onClick={() => toggleCell(c, h)}
+                          aria-pressed={picked}
+                          aria-label={`คอร์ต ${c} เวลา ${formatHourLabel(h)}: ${label}`}
+                          {...btnProps}
                         >
-                          {mineStatus ? "คุณจอง" : takenStatus ? "เต็ม" : selStatus ? "✓" : ""}
-                        </td>
+                          <span style={ui.statusPill(takenCell, picked, mineCell)}>{label}</span>
+                        </button>
                       );
                     })}
-                  </tr>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-            <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <textarea
-                placeholder="หมายเหตุเพิ่มเติม..."
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                style={ui.textarea}
-              />
-              <button type="button" onClick={handleConfirm} disabled={loading || selected.length === 0} style={ui.confirmBtn}>
-                {loading ? "กำลังบันทึก..." : "ยืนยันการจอง"}
-              </button>
-              {msg && <div style={ui.msg}>{msg}</div>}
+              </div>
             </div>
           </section>
+
+          {/* ขวา: สรุปการจอง */}
+          <aside style={ui.right}>
+            <div style={ui.card}>
+              <h2 style={ui.cardTitle}>สรุปการจอง</h2>
+              <div style={ui.summaryRow}><span>วันที่</span><b>{dateKey}</b></div>
+              <div style={ui.summaryRow}><span>จำนวนรายการ</span><b>{selected.length} ชั่วโมง</b></div>
+              <div style={ui.summaryRow}><span>ราคา/ชั่วโมง</span><b>{PRICE_PER_HOUR.toLocaleString()} บาท</b></div>
+              <div style={{ ...ui.summaryRow, borderTop: `1px dashed ${colors.line}`, paddingTop: 10, marginTop: 6 }}>
+                <span>รวมทั้งสิ้น</span>
+                <b style={{ color: colors.accent }}>
+                  {(selected.length * PRICE_PER_HOUR).toLocaleString()} บาท
+                </b>
+              </div>
+
+              <div style={{ marginTop: 12 }}>
+                <label htmlFor="note" style={ui.labelSm}>หมายเหตุ (ถ้ามี)</label>
+                <textarea
+                  id="note"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="เช่น ต้องการคอร์ตติดผนัง / เปิดไฟเพิ่ม"
+                  style={ui.textarea}
+                  rows={3}
+                />
+              </div>
+
+              <button
+                onClick={handleConfirm}
+                disabled={loading || !selected.length}
+                style={{ ...ui.confirmBtn, opacity: loading ? 0.75 : 1 }}
+              >
+                {loading ? "กำลังยืนยัน..." : "ยืนยันการจอง"}
+              </button>
+
+              {!!selected.length && (
+                <>
+                  <div style={{ marginTop: 14, fontSize: 13, color: colors.muted }}>รายการที่เลือก</div>
+                  <ul style={ui.selectedList}>
+                    {selected
+                      .slice()
+                      .sort((a, b) => a.court - b.court || a.hour - b.hour)
+                      .map((s, idx) => (
+                        <li key={idx} style={ui.selectedItem}>
+                          <span>คอร์ต {s.court}</span>
+                          <span>{formatHourLabel(s.hour)}</span>
+                          <button
+                            onClick={() => toggleCell(s.court, s.hour)}
+                            style={ui.removeBtn}
+                            title="เอาออก"
+                          >
+                            ✕
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                </>
+              )}
+
+              {msg && <div style={ui.message}>{msg}</div>}
+            </div>
+          </aside>
         </div>
       </div>
     </div>
   );
 }
 
-/** ===== UI STYLES ===== */
+/** ===== UI (ออกแบบให้สวย แล้วสเกลทั้งบล็อกให้พอดีจอ) ===== */
 const ui = {
   page: {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "flex-start",
     minHeight: "100vh",
-    padding: 16,
-    backgroundColor: colors.bg,
+    background: colors.bg,
+    color: colors.ink,
+    fontFamily:
+      'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", sans-serif',
+    padding: 8,
+    overflow: "hidden",
   },
+
   contentWrap: {
-    display: "inline-block",
-    padding: 16,
+    transform: "scale(1)",
+    transformOrigin: "top left",
+    width: "auto",
   },
+
   container: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 12,
-    fontFamily: "sans-serif",
+    width: 1200,
+    margin: "0 auto",
+    display: "grid",
+    gridTemplateColumns: "1fr 340px",
+    gap: 16,
   },
-  left: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 12,
-  },
+
+  /* Left */
+  left: { minWidth: 0 },
   toolbar: {
     display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
     gap: 12,
-    alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 10,
+    flexWrap: "wrap",
   },
   backBtn: {
-    background: colors.primary,
-    color: "#fff",
-    border: "none",
-    borderRadius: 6,
-    padding: "6px 12px",
+    padding: "8px 12px",
+    borderRadius: 10,
+    border: `1px solid ${colors.lineStrong}`,
+    background: "#fff",
     cursor: "pointer",
+    fontWeight: 700,
+  },
+  labelSm: { display: "block", fontSize: 13, fontWeight: 700, marginBottom: 6, color: colors.muted },
+  badgeNote: {
+    display: "inline-block",
+    fontSize: 12,
+    padding: "6px 10px",
+    borderRadius: 999,
+    background: colors.primarySoft,
+    color: colors.primaryDark,
+    border: `1px solid ${colors.primary}`,
+    width: "fit-content",
   },
   dateInput: {
-    padding: "6px 10px",
-    borderRadius: 6,
+    padding: "10px 12px",
     border: `1px solid ${colors.line}`,
+    borderRadius: 10,
+    background: "#fff",
+    fontSize: 14,
+    outline: "none",
   },
-  table: {
-    borderCollapse: "collapse",
-    width: "100%",
+
+  /* Legend */
+  legendWrap: {
+    display: "flex",
+    alignItems: "center",
+    gap: 14,
+    background: "#fff",
+    padding: "8px 12px",
+    borderRadius: 999,
+    border: `1px solid ${colors.line}`,
+    boxShadow: "0 4px 18px rgba(2,6,12,.05)",
+    whiteSpace: "nowrap",
   },
-  hourCell: {
-    padding: "6px 10px",
+  legendItem: { display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: colors.muted },
+  dotFree:  { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: "#fff", border: `1px solid ${colors.lineStrong}` },
+  dotPicked:{ display: "inline-block", width: 12, height: 12, borderRadius: 999, background: colors.primary, border: `1px solid ${colors.primaryDark}` },
+  dotTaken: { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: colors.taken, border: `1px solid ${colors.lineStrong}` },
+  dotMine:  { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: "#dcfce7", border: `1px solid ${colors.success}` },
+
+  /* กรอบตาราง */
+  tableFrame: {
+    background: colors.card,
+    border: `1px solid ${colors.lineStrong}`,
+    borderRadius: 16,
+    boxShadow: "0 12px 30px rgba(2,6,12,0.06)",
+    overflow: "hidden",
+  },
+  headerRow: {
+    display: "grid",
+    gridTemplateColumns: `140px repeat(${COURTS.length}, 1fr)`,
+    borderBottom: `1px solid ${colors.lineStrong}`,
+    background: colors.primarySoft,
+    boxShadow: "inset 0 -1px 0 " + colors.lineStrong,
+  },
+  headerCell: {
+    padding: "12px 10px",
+    fontSize: 13,
+    fontWeight: 900,
+    textAlign: "center",
+    borderLeft: `1px solid ${colors.lineStrong}`,
+    color: colors.primaryDark,
+    letterSpacing: 0.2,
+  },
+
+  bodyGrid: {
+    display: "grid",
+    gridAutoFlow: "row",
+  },
+  row: {
+    display: "grid",
+    gridTemplateColumns: `140px repeat(${COURTS.length}, 1fr)`,
+    borderTop: `1px solid ${colors.line}`,
+  },
+  rowAlt: { background: "#fbfdfc" },
+  timeCell: {
+    padding: "12px 10px",
+    fontSize: 13,
+    textAlign: "left",
+    background: "#ffffff",
+    borderRight: `1px solid ${colors.lineStrong}`,
     fontWeight: 700,
-    textAlign: "center",
-    border: `1px solid ${colors.line}`,
   },
-  cell: {
-    padding: 6,
-    textAlign: "center",
+
+  cellBtn: {
+    padding: "14px 8px",
+    fontSize: 13,
+    background: "#fff",
+    border: "none",
+    borderLeft: `1px solid ${colors.line}`,
+    cursor: "pointer",
+    transition: "transform .06s ease, box-shadow .12s ease, background .12s ease",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    outline: "none",
+  },
+  cellFree:   { background: "#fff" },
+  cellPicked: {
+    background: colors.primarySoft,
+    boxShadow: "inset 0 0 0 2px " + colors.primary,
+  },
+  cellTaken:  {
+    background: colors.taken,
+    color: "#9ca3af",
+    cursor: "not-allowed",
+  },
+  // ✅ สีเขียวสำหรับ “ของฉัน”
+  cellMine: {
+    background: "#bbf7d0", // เขียวสด (tailwind: green-300)
+    boxShadow: `inset 0 0 0 2px ${colors.success}`,
+    color: "#065f46",
+    fontWeight: 700,
+    cursor: "not-allowed",
+  },
+  // ป้องกันปุ่มซีด/หรี่เวลาเป็นของฉัน (ไม่ใช้ disabled จริง แต่ให้กดไม่ติด)
+  mineNoDim: {
+    pointerEvents: "none",
+    cursor: "not-allowed",
+    opacity: 1,
+    filter: "none",
+  },
+
+  statusPill: (isTaken, isPicked, isMine) => ({
+    fontSize: 12,
+    fontWeight: 800,
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: `1px solid ${
+      isMine ? colors.success
+      : isTaken ? colors.lineStrong
+      : isPicked ? colors.primaryDark
+      : colors.lineStrong
+    }`,
+    background: isMine
+      ? "#22c55e" // เขียวชัด (tailwind: green-400)
+      : (isTaken
+          ? "#f1f5f9"
+          : isPicked
+            ? "#dcfce7"
+            : "#ffffff"),
+    color: isMine ? "#fff" : (isTaken ? "#94a3b8" : isPicked ? colors.success : colors.ink),
+    letterSpacing: 0.2,
+  }),
+
+  /* Right */
+  right: { minWidth: 0 },
+  card: {
+    background: colors.card,
     border: `1px solid ${colors.line}`,
-    borderRadius: 4,
-    userSelect: "none",
+    borderRadius: 16,
+    boxShadow: "0 12px 30px rgba(2,6,12,0.06)",
+    padding: 14,
+    position: "sticky",
+    top: 0,
+  },
+  cardTitle: { margin: 0, fontSize: 18, fontWeight: 900, color: colors.primaryDark },
+  summaryRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    fontSize: 14,
+    marginTop: 10,
   },
   textarea: {
-    flex: 1,
-    minHeight: 50,
-    padding: 6,
-    borderRadius: 6,
+    width: "100%",
+    padding: "10px 14px",
+    borderRadius: 12,
     border: `1px solid ${colors.line}`,
+    outline: "none",
+    fontSize: 14,
+    lineHeight: "1.5",
+    background: "#fff",
     resize: "vertical",
+    boxSizing: "border-box",
   },
   confirmBtn: {
-    background: colors.primary,
+    width: "100%",
+    marginTop: 12,
+    padding: "12px 14px",
+    background: colors.primaryDark,
     color: "#fff",
     border: "none",
-    borderRadius: 6,
-    padding: "6px 12px",
+    borderRadius: 12,
+    cursor: "pointer",
+    fontWeight: 800,
+    fontSize: 15,
+  },
+  selectedList: {
+    marginTop: 8,
+    listStyle: "none",
+    padding: 0,
+    borderTop: `1px solid ${colors.line}`,
+  },
+  selectedItem: {
+    display: "grid",
+    gridTemplateColumns: "auto 1fr auto",
+    gap: 8,
+    alignItems: "center",
+    padding: "8px 0",
+    fontSize: 13,
+    borderBottom: `1px dashed ${colors.line}`,
+  },
+  removeBtn: {
+    background: "transparent",
+    border: `1px solid ${colors.line}`,
+    borderRadius: 8,
+    padding: "2px 8px",
     cursor: "pointer",
   },
-  msg: {
-    marginTop: 6,
-    color: colors.ink,
+  message: {
+    marginTop: 10,
+    fontSize: 14,
+    textAlign: "center",
+    color: colors.accent,
   },
 };
