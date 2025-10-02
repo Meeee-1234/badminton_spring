@@ -1,6 +1,5 @@
 // src/Details.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 
 const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
 
@@ -13,31 +12,40 @@ const PRICE_PER_HOUR = 80;
 
 /** เปลี่ยนเส้นทาง API ให้ตรงกับระบบคุณ */
 const ENDPOINTS = {
-  // ตัวอย่าง: /api/bookings/taken?date=2025-10-02  (แก้ตาม backend)
   taken: (date) => `${API}/api/bookings/taken?date=${encodeURIComponent(date)}`,
-  // สร้างการจอง
   create: `${API}/api/bookings`,
 };
 
+/** ===== Helpers ===== */
+const toDateKey = (d = new Date()) => d.toISOString().split("T")[0];
+const msUntilNextMidnight = () => {
+  const now = new Date();
+  const next = new Date(now);
+  next.setDate(now.getDate() + 1);
+  next.setHours(0, 0, 0, 0);
+  return next.getTime() - now.getTime();
+};
+
+/** ===== THEME (โทนเขียวอ่อน) ===== */
 const colors = {
-  primary: "#10B981",
-  primaryDark: "#059669",
+  primary: "#34d399",      // เขียวอ่อน
+  primaryDark: "#10b981",  // เขียวกลาง
+  primarySoft: "#ecfdf5",  // พื้นหลังเขียวจาง
+  accent: "#22c55e",       // เขียวสด
   ink: "#0f172a",
   muted: "#64748b",
   line: "#e5e7eb",
   card: "#ffffff",
-  bg: "#f8fafc",
+  bg: "#f6fef8",           // เขียวอมขาวทั้งหน้า
   danger: "#ef4444",
   success: "#16a34a",
+  taken: "#e5e7eb",
 };
 
 export default function Details() {
-  
-  const [dateKey, setDateKey] = useState(() => {
-    const today = new Date().toISOString().split("T")[0];
-    return today;
-  });
-  const [taken, setTaken] = useState([]); // ["1:9","2:10"]
+  // 🔒 ล็อกให้เป็น “วันนี้” เสมอ
+  const [dateKey, setDateKey] = useState(() => toDateKey());
+  const [taken, setTaken] = useState([]);    // ["1:9","2:10"]
   const [selected, setSelected] = useState([]); // [{court, hour}]
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
@@ -46,38 +54,56 @@ export default function Details() {
   const totalHours = selected.length;
   const totalPrice = totalHours * PRICE_PER_HOUR;
 
-  // โหลดรายการที่ถูกจองแล้วจาก backend
+  // ⏱️ อัปเดตเป็นวันใหม่อัตโนมัติทุกเที่ยงคืน (และรีเฟรชตาราง)
+  useEffect(() => {
+    const tick = () => {
+      const today = toDateKey();
+      setDateKey((prev) => (prev !== today ? today : prev));
+    };
+
+    // ตั้งครั้งแรกตอนเข้า
+    tick();
+
+    // setTimeout ถึงเที่ยงคืน จากนั้น setInterval ทุก 24 ชม.
+    const first = setTimeout(() => {
+      tick();
+      const everyDay = setInterval(tick, 24 * 60 * 60 * 1000);
+      // เก็บไว้ในตัวแปร global ของ effect เพื่อเคลียร์
+      (window.__dailyTimer__ = everyDay);
+    }, msUntilNextMidnight());
+
+    return () => {
+      clearTimeout(first);
+      if (window.__dailyTimer__) {
+        clearInterval(window.__dailyTimer__);
+        delete window.__dailyTimer__;
+      }
+    };
+  }, []);
+
+  // โหลดรายการที่ถูกจองแล้วจาก backend (ทุกครั้งที่วันเปลี่ยน)
   useEffect(() => {
     fetch(ENDPOINTS.taken(dateKey))
       .then((res) => res.json())
-      .then((data) => {
-        setTaken(data.taken || []);
-      })
-      .catch((err) => {
-        console.error("Load taken error:", err);
-      });
+      .then((data) => setTaken(data.taken || []))
+      .catch((err) => console.error("Load taken error:", err));
   }, [dateKey]);
 
-  // helper: แปลงเป็น label เช่น 9 => "09:00-10:00"
+  // label เช่น 9 => "09:00 - 10:00"
   const formatHourLabel = (h) => `${h.toString().padStart(2, "0")}:00 - ${h + 1}:00`;
-
-  // helper: เช็คว่าเวลานี้ถูกจองหรือยัง
   const isTaken = (c, h) => taken.includes(`${c}:${h}`);
-
-  // helper: เช็คว่า user เลือกไปแล้วหรือยัง
   const isSelected = (c, h) => selected.some((s) => s.court === c && s.hour === h);
 
-  // toggle เลือก/ยกเลิก
   const toggleCell = (c, h) => {
     if (isTaken(c, h)) return;
     if (isSelected(c, h)) {
-      setSelected(selected.filter((s) => !(s.court === c && s.hour === h)));
+      setSelected((prev) => prev.filter((s) => !(s.court === c && s.hour === h)));
     } else {
-      setSelected([...selected, { court: c, hour: h }]);
+      setSelected((prev) => [...prev, { court: c, hour: h }]);
     }
   };
 
-  // ✅ กดปุ่มยืนยันการจอง
+  // ✅ ยืนยันการจอง
   const handleConfirm = async () => {
     setLoading(true);
     setMsg("");
@@ -90,7 +116,6 @@ export default function Details() {
         return;
       }
 
-      // ส่งแต่ละ booking ไป backend
       for (const s of selected) {
         const res = await fetch(ENDPOINTS.create, {
           method: "POST",
@@ -106,7 +131,7 @@ export default function Details() {
 
         const data = await res.json();
         if (!res.ok) {
-          setMsg(`❌ จองคอร์ต ${s.court} เวลา ${formatHourLabel(s.hour)} ไม่สำเร็จ: ${data.error}`);
+          setMsg(`❌ จองคอร์ต ${s.court} เวลา ${formatHourLabel(s.hour)} ไม่สำเร็จ: ${data.error || "unknown"}`);
           setLoading(false);
           return;
         }
@@ -120,7 +145,6 @@ export default function Details() {
       const res2 = await fetch(ENDPOINTS.taken(dateKey));
       const data2 = await res2.json();
       setTaken(data2.taken || []);
-
     } catch (err) {
       console.error("Booking error:", err);
       setMsg("❌ Server error");
@@ -132,25 +156,29 @@ export default function Details() {
   return (
     <div style={ui.page}>
       <div style={ui.container}>
-        {/* ซ้าย: ตัวกรอง + ตาราง */}
+        {/* ซ้าย: ตาราง */}
         <section style={ui.left}>
           <div style={ui.toolbar}>
-            <div>
-              <label htmlFor="date" style={ui.labelSm}>เลือกวันที่</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label htmlFor="date" style={ui.labelSm}>วันที่ (อัตโนมัติ)</label>
+              {/* 🔒 input ปิดการแก้ไข / disabled */}
               <input
                 id="date"
                 type="date"
                 value={dateKey}
-                onChange={(e) => setDateKey(e.target.value)}
-                style={ui.dateInput}
+                disabled
+                readOnly
+                title="ระบบจะอัปเดตเป็นวันใหม่โดยอัตโนมัติทุกเที่ยงคืน"
+                style={{ ...ui.dateInput, background: colors.primarySoft, borderColor: colors.primary }}
               />
+              <span style={ui.badgeNote}>ตาราง “วันนี้” • อัปเดตอัตโนมัติเที่ยงคืน</span>
             </div>
           </div>
 
           {/* ตารางคอร์ต x ชั่วโมง */}
           <div style={ui.tableWrap}>
             <div style={ui.headerRow}>
-              <div style={{ ...ui.headerCell, width: 86 }}>เวลา</div>
+              <div style={{ ...ui.headerCell, width: 110 }}>เวลา</div>
               {COURTS.map((c) => (
                 <div key={c} style={ui.headerCell}>คอร์ต {c}</div>
               ))}
@@ -160,26 +188,26 @@ export default function Details() {
               <div key={h} style={ui.row}>
                 <div style={{ ...ui.timeCell }}>{formatHourLabel(h)}</div>
                 {COURTS.map((c) => {
-                  const taken = isTaken(c, h);
+                  const takenCell = isTaken(c, h);
                   const picked = isSelected(c, h);
                   return (
                     <button
                       key={`${c}:${h}`}
                       onClick={() => toggleCell(c, h)}
-                      disabled={taken}
+                      disabled={takenCell}
                       style={{
                         ...ui.cellBtn,
-                        ...(taken ? ui.cellTaken : picked ? ui.cellPicked : {}),
+                        ...(takenCell ? ui.cellTaken : picked ? ui.cellPicked : {}),
                       }}
                       title={
-                        taken
+                        takenCell
                           ? "ถูกจองแล้ว"
                           : picked
                           ? "เลือกรายการนี้แล้ว (คลิกเพื่อยกเลิก)"
                           : "คลิกเพื่อเลือก"
                       }
                     >
-                      {taken ? "เต็ม" : picked ? "เลือกแล้ว" : "ว่าง"}
+                      {takenCell ? "เต็ม" : picked ? "เลือกแล้ว" : "ว่าง"}
                     </button>
                   );
                 })}
@@ -196,7 +224,7 @@ export default function Details() {
             <div style={ui.summaryRow}><span>จำนวนรายการ</span><b>{totalHours} ชั่วโมง</b></div>
             <div style={ui.summaryRow}><span>ราคา/ชั่วโมง</span><b>{PRICE_PER_HOUR.toLocaleString()} บาท</b></div>
             <div style={{ ...ui.summaryRow, borderTop: `1px dashed ${colors.line}`, paddingTop: 10, marginTop: 6 }}>
-              <span>รวมทั้งสิ้น</span><b style={{ color: colors.primary }}>{totalPrice.toLocaleString()} บาท</b>
+              <span>รวมทั้งสิ้น</span><b style={{ color: colors.accent }}>{totalPrice.toLocaleString()} บาท</b>
             </div>
 
             <div style={{ marginTop: 12 }}>
@@ -251,7 +279,7 @@ export default function Details() {
   );
 }
 
-/** ===== UI styles (inline, โทนเดียวกับ Login/Register) ===== */
+/** ===== UI styles (inline, โทนเขียวอ่อน) ===== */
 const ui = {
   page: {
     minHeight: "100vh",
@@ -278,7 +306,17 @@ const ui = {
     gap: 12,
     marginBottom: 12,
   },
-  labelSm: { display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6, color: colors.muted },
+  labelSm: { display: "block", fontSize: 13, fontWeight: 700, marginBottom: 6, color: colors.muted },
+  badgeNote: {
+    display: "inline-block",
+    fontSize: 12,
+    padding: "6px 10px",
+    borderRadius: 999,
+    background: colors.primarySoft,
+    color: colors.primaryDark,
+    border: `1px solid ${colors.primary}`,
+    width: "fit-content",
+  },
   dateInput: {
     padding: "10px 12px",
     border: `1px solid ${colors.line}`,
@@ -297,27 +335,28 @@ const ui = {
   },
   headerRow: {
     display: "grid",
-    gridTemplateColumns: `86px repeat(${COURTS.length}, 1fr)`,
+    gridTemplateColumns: `110px repeat(${COURTS.length}, 1fr)`,
     borderBottom: `1px solid ${colors.line}`,
-    background: "#f3f4f6",
+    background: colors.primarySoft,
   },
   headerCell: {
     padding: "10px 8px",
     fontSize: 13,
-    fontWeight: 700,
+    fontWeight: 800,
     textAlign: "center",
     borderLeft: `1px solid ${colors.line}`,
+    color: colors.primaryDark,
   },
   row: {
     display: "grid",
-    gridTemplateColumns: `86px repeat(${COURTS.length}, 1fr)`,
+    gridTemplateColumns: `110px repeat(${COURTS.length}, 1fr)`,
     borderTop: `1px solid ${colors.line}`,
   },
   timeCell: {
     padding: "10px 8px",
     fontSize: 12,
     textAlign: "left",
-    background: "#f9fafb",
+    background: "#fbfdfc",
     borderRight: `1px solid ${colors.line}`,
   },
   cellBtn: {
@@ -327,15 +366,19 @@ const ui = {
     border: "none",
     borderLeft: `1px solid ${colors.line}`,
     cursor: "pointer",
+    transition: "transform .05s ease",
   },
+  // ✅ สีตอนเลือก: เขียวอ่อน + เส้นขอบเขียว
   cellPicked: {
-    background: "#ecfeff", // ฟ้าอ่อน
-    outline: `2px solid #22d3ee`,
+    background: colors.primarySoft,
+    outline: `2px solid ${colors.primary}`,
     outlineOffset: -2,
-    fontWeight: 700,
+    fontWeight: 800,
+    transform: "scale(0.995)",
   },
+  // ❌ สีช่องที่ถูกจองแล้ว
   cellTaken: {
-    background: "#f5f5f5",
+    background: colors.taken,
     color: "#9ca3af",
     cursor: "not-allowed",
   },
@@ -347,11 +390,11 @@ const ui = {
     border: `1px solid ${colors.line}`,
     borderRadius: 14,
     boxShadow: "0 10px 30px rgba(2,6,12,0.06)",
-    padding: 10,
+    padding: 12,
     position: "sticky",
     top: 16,
   },
-  cardTitle: { margin: 0, fontSize: 18, fontWeight: 800 },
+  cardTitle: { margin: 0, fontSize: 18, fontWeight: 900, color: colors.primaryDark },
   summaryRow: {
     display: "flex",
     alignItems: "center",
@@ -360,28 +403,27 @@ const ui = {
     marginTop: 10,
   },
   textarea: {
-  width: "100%",
-  padding: "10px 14px",
-  borderRadius: 10,
-  border: `1px solid ${colors.line}`,
-  outline: "none",
-  fontSize: 14,
-  lineHeight: "1.5",
-  background: "#fff",
-  resize: "vertical",
-  boxSizing: "border-box",    
-},
-
+    width: "100%",
+    padding: "10px 14px",
+    borderRadius: 10,
+    border: `1px solid ${colors.line}`,
+    outline: "none",
+    fontSize: 14,
+    lineHeight: "1.5",
+    background: "#fff",
+    resize: "vertical",
+    boxSizing: "border-box",
+  },
   confirmBtn: {
     width: "100%",
     marginTop: 12,
     padding: "12px 14px",
-    background: colors.primary,
+    background: colors.primaryDark,
     color: "#fff",
     border: "none",
     borderRadius: 12,
     cursor: "pointer",
-    fontWeight: 700,
+    fontWeight: 800,
     fontSize: 15,
   },
   selectedList: {
@@ -406,10 +448,10 @@ const ui = {
     padding: "2px 8px",
     cursor: "pointer",
   },
-
   message: {
     marginTop: 10,
     fontSize: 14,
     textAlign: "center",
+    color: colors.accent,
   },
 };

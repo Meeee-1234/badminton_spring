@@ -5,6 +5,10 @@ const cors = require("cors");
 const bcrypt = require("bcrypt");
 require("dotenv").config();
 
+// Avatar
+const path = require("path");
+const multer = require("multer");
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -61,6 +65,21 @@ const bookingSchema = new mongoose.Schema(
 );
 
 const Booking = mongoose.model("Booking", bookingSchema);
+
+
+// Profile Schema
+const profileSchema = new mongoose.Schema(
+  {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
+    avatar: { type: String, default: "" }, // เก็บ URL รูป (เช่น /uploads/xxx.png หรือ Cloudinary)
+    bio: { type: String, default: "" },
+  },
+  { timestamps: true, collection: "profiles" }
+);
+
+const Profile = mongoose.model("Profile", profileSchema);
+
+
 
 // ---------- Routes ----------
 app.get("/", (req, res) => {
@@ -253,9 +272,42 @@ app.get("/api/bookings/my/:userId", async (req, res) => {
 });
 
 
+// ---------- Multer Config ----------
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/"); // โฟลเดอร์เก็บไฟล์
+  },
+  filename: (req, file, cb) => {
+    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, unique + path.extname(file.originalname)); // ชื่อไฟล์ใหม่
+  },
+});
 
+const upload = multer({ storage });
 
+// ทำ static route ให้เข้าถึงไฟล์ได้
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
+// ---------- Upload Avatar ----------
+app.post("/api/profile/:userId/avatar", upload.single("avatar"), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+
+    let profile = await Profile.findOneAndUpdate(
+      { user: userId },
+      { avatar: fileUrl },
+      { new: true, upsert: true }
+    );
+
+    res.json({ message: "อัพโหลดรูปเรียบร้อย", avatar: fileUrl, profile });
+  } catch (err) {
+    console.error("❌ Upload error:", err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 
 
