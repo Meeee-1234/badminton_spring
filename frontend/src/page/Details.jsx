@@ -36,13 +36,6 @@ const ENDPOINTS = {
 };
 
 const toDateKey = (d = new Date()) => d.toISOString().split("T")[0];
-const msUntilNextMidnight = () => {
-  const now = new Date();
-  const next = new Date(now);
-  next.setDate(now.getDate() + 1);
-  next.setHours(0, 0, 0, 0);
-  return next.getTime() - now.getTime();
-};
 
 export default function Details() {
   const navigate = useNavigate();
@@ -104,26 +97,29 @@ export default function Details() {
     };
   }, []);
 
-  // อัปเดตเป็นวันใหม่อัตโนมัติเที่ยงคืน
-  useEffect(() => {
-    const tick = () => {
-      const today = toDateKey();
-      setDateKey((prev) => (prev !== today ? today : prev));
-    };
-    tick();
-    const first = setTimeout(() => {
-      tick();
-      const everyDay = setInterval(tick, 24 * 60 * 60 * 1000);
-      (window.__dailyTimer__ = everyDay);
-    }, msUntilNextMidnight());
-    return () => {
-      clearTimeout(first);
-      if (window.__dailyTimer__) {
-        clearInterval(window.__dailyTimer__);
-        delete window.__dailyTimer__;
+// ✅ อัปเดตเป็นวันใหม่อัตโนมัติ
+useEffect(() => {
+  const updateDate = () => {
+    const today = toDateKey();
+    setDateKey((prev) => {
+      if (prev !== today) {
+        // รีเซ็ตสถานะเมื่อเข้าสู่วันใหม่
+        setTaken([]);
+        setMine([]);
+        setSelected([]);
+        return today;
       }
-    };
-  }, []);
+      return prev;
+    });
+  };
+
+  updateDate(); // run ครั้งแรก
+  const interval = setInterval(updateDate, 60 * 1000); // เช็กทุกนาที
+
+  return () => clearInterval(interval);
+}, []);
+
+
 
   // โหลดสถานะจอง (รวม “ของฉัน”)
   useEffect(() => {
