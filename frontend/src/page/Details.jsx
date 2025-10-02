@@ -31,7 +31,7 @@ const colors = {
 /** เปลี่ยนเส้นทาง API ให้ตรงกับระบบคุณ */
 const ENDPOINTS = {
   taken: (date) => `${API}/api/bookings/taken?date=${encodeURIComponent(date)}`,
-  mine:  (date, userId) => `${API}/api/bookings/mine?date=${encodeURIComponent(date)}&userId=${encodeURIComponent(userId)}`,
+  mine: (date, userId) => `${API}/api/bookings/my/${encodeURIComponent(userId)}/${encodeURIComponent(date)}`,
   create: `${API}/api/bookings`,
 };
 
