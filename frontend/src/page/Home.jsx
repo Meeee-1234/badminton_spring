@@ -51,12 +51,12 @@ export default function Home() {
 
             <nav style={{ display: "flex", gap: "20px", alignItems: "center" }}>
                 {user ? (
-                    <Link to="/profile"
-                        style={{ padding: "10px 20px", borderRadius: "8px", background: "#10b981", color: "white", fontWeight: "600",
-                                textDecoration: "none", transition: "0.3s", boxShadow: "0 4px 8px rgba(16,185,129,0.3)", }}
-                        onMouseOver={(e) => (e.target.style.background = "#059669") }
-                        onMouseOut={(e) => (e.target.style.background = "#10b981") } >
-                        {user.name || user.email} {/* แสดงชื่อ หรือถ้าไม่มีใช้ email */}
+                    <Link to={user.role === "admin" ? "/AdminManagement" : "/profile"} 
+                          style={{ padding: "10px 20px", borderRadius: "8px", background: "#10b981", color: "white", fontWeight: "600", 
+                                   textDecoration: "none", transition: "0.3s", boxShadow: "0 4px 8px rgba(16,185,129,0.3)", }}
+                          onMouseOver={(e) => (e.target.style.background = "#059669")}
+                          onMouseOut={(e) => (e.target.style.background = "#10b981")}>
+                      {user.name || user.email}{" "}
                     </Link>
                     ) : (
                     <Link to="/login" 
@@ -64,7 +64,7 @@ export default function Home() {
                                 textDecoration: "none", transition: "0.3s", boxShadow: "0 4px 8px rgba(16,185,129,0.3)", }}
                         onMouseOver={(e) => (e.target.style.background = "#059669") }
                         onMouseOut={(e) => (e.target.style.background = "#10b981") }>
-                        Login
+                      Login
                     </Link>
                 )}
             </nav> 

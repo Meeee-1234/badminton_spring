@@ -3,6 +3,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken"); // Admin....
 require("dotenv").config();
 
 
@@ -42,6 +43,7 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true },
     phone: { type: String, required: true },
     password: { type: String, required: true }, // hash password
+    role: { type: String, enum: ["user", "admin"], default: "user" },
   },
   { timestamps: true, collection: "users" }
 );
@@ -62,6 +64,55 @@ const bookingSchema = new mongoose.Schema(
 );
 
 const Booking = mongoose.model("Booking", bookingSchema);
+
+
+// ---------- Admin Seed ----------
+async function createAdmin() {
+  const adminEmail = "admin@gmail.com";
+  const exists = await User.findOne({ email: adminEmail });
+  if (!exists) {
+    const hash = await bcrypt.hash("Admin1234!", 10); // ✅ hash password ก่อน
+    await User.create({
+      name: "Admin",
+      email: adminEmail,      // ✅ ใช้ตัวแปรที่เป็น string ข้างบน
+      phone: "0812345678",
+      password: hash,         // ✅ เก็บ hash ไม่ใช่ plain text
+      role: "admin",
+    });
+    console.log("✅ Admin user created");
+  }
+}
+createAdmin();
+
+
+
+// ---------- Middleware ----------
+function isAdmin(req, res, next) {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "Unauthorized" });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "supersecret");
+
+    if (decoded.role !== "admin") {
+      return res.status(403).json({ error: "Forbidden: Admin only" });
+    }
+    next();
+  } catch (err) {
+    res.status(401).json({ error: "Invalid token" });
+  }
+}
+
+// route ที่ต้องเป็น admin เท่านั้น
+app.get("/api/admin/users", isAdmin, async (req, res) => {
+  const users = await User.find({}, { password: 0 });
+  res.json(users);
+});
+
+
+
+
+
 
 
 // ---------- Routes ----------
@@ -96,6 +147,7 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
+
 // 📄 Get users
 app.get("/api/users", async (req, res) => {
   try {
@@ -107,6 +159,7 @@ app.get("/api/users", async (req, res) => {
   }
 });
 
+// 📄 Login
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -115,36 +168,30 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(400).json({ error: "กรอกอีเมลและรหัสผ่าน" });
     }
 
-    // หา user ตาม email
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ error: "ไม่พบบัญชีนี้" });
     }
 
-    // เทียบรหัสผ่าน
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ error: "รหัสผ่านไม่ถูกต้อง" });
     }
 
-    // 🔑 สร้าง token (ใช้ jwt)
-    const jwt = require("jsonwebtoken");
+    // ✅ ฝัง role เข้า token ด้วย
     const token = jwt.sign(
-      { id: user._id, email: user.email },
-      process.env.JWT_SECRET || "supersecret", // ตั้งค่าใน .env
+      { id: user._id, email: user.email, role: user.role },
+      process.env.JWT_SECRET || "supersecret",
       { expiresIn: "1d" }
     );
 
-    // ตัด password ออก
     const { password: _, ...safeUser } = user.toObject();
-
     res.json({ message: "เข้าสู่ระบบสำเร็จ", token, user: safeUser });
   } catch (err) {
     console.error("❌ Login error:", err.message);
     res.status(500).json({ error: "Server error", detail: err.message });
   }
 });
-
 
 
 // 📄 Get user by id
@@ -301,6 +348,21 @@ app.get("/api/profile/:userId", async (req, res) => {
   } catch (err) {
     console.error("❌ Profile get error:", err.message);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+
+
+// 📄 Get all bookings (admin only)
+app.get("/api/admin/bookings", isAdmin, async (req, res) => {
+  try {
+    const bookings = await Booking.find()
+      .populate("user", "name email phone")
+      .sort({ date: 1, hour: 1 });
+    res.json(bookings);
+  } catch (err) {
+    console.error("❌ Get all bookings error:", err.message);
+    res.status(500).json({ error: "Server error while fetching bookings" });
   }
 });
 
