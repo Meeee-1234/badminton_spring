@@ -282,9 +282,6 @@ app.get("/api/bookings/my/:userId", async (req, res) => {
 });
 
 
-const path = require("path");
-const multer = require("multer");
-
 
 
 // ---------- Upload Avatar ----------

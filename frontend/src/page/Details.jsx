@@ -1,5 +1,6 @@
 // src/Details.jsx
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom"; // ✅ ปุ่มกลับหน้าแรก
 
 const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
 
@@ -10,17 +11,18 @@ const HOURS = Array.from({ length: CLOSE_HOUR - OPEN_HOUR }, (_, i) => OPEN_HOUR
 const COURTS = [1, 2, 3, 4, 5, 6];
 const PRICE_PER_HOUR = 80;
 
-// ปรับได้: ส่วนสูงโดยประมาณที่ใช้โดย toolbar/legend/ระยะห่างด้านบน
-// ถ้าตารางยังชนหรือเหลือพื้นที่ ปรับเลขนี้ขึ้น/ลงได้ทันที (เช่น 180, 220, 260)
+/** ย่อทั้งหน้า 50% */
+const SCALE = 0.5;
+
+// ปรับส่วนสูงพื้นที่เหนือ/ใต้ตาราง (ยิ่งเลขมาก ตารางยิ่งเตี้ยลง)
+// เมื่อใช้ SCALE แล้วมักพอดี ถ้ายังไม่เป๊ะให้ปรับเลขนี้
 const OFFSET_PX = 220;
 
-/** เปลี่ยนเส้นทาง API ให้ตรงกับระบบคุณ */
 const ENDPOINTS = {
   taken: (date) => `${API}/api/bookings/taken?date=${encodeURIComponent(date)}`,
   create: `${API}/api/bookings`,
 };
 
-/** ===== Helpers ===== */
 const toDateKey = (d = new Date()) => d.toISOString().split("T")[0];
 const msUntilNextMidnight = () => {
   const now = new Date();
@@ -30,7 +32,7 @@ const msUntilNextMidnight = () => {
   return next.getTime() - now.getTime();
 };
 
-/** ===== THEME (โทนเขียวอ่อน) ===== */
+/** THEME (โทนเขียวอ่อน) */
 const colors = {
   primary: "#34d399",
   primaryDark: "#10b981",
@@ -48,7 +50,7 @@ const colors = {
 };
 
 export default function Details() {
-  // 🔒 ล็อกให้เป็น “วันนี้” เสมอ
+  const navigate = useNavigate();
   const [dateKey, setDateKey] = useState(() => toDateKey());
   const [taken, setTaken] = useState([]);       // ["1:9","2:10"]
   const [selected, setSelected] = useState([]); // [{court, hour}]
@@ -59,7 +61,7 @@ export default function Details() {
   const totalHours = selected.length;
   const totalPrice = totalHours * PRICE_PER_HOUR;
 
-  // ⏱️ อัปเดตเป็นวันใหม่อัตโนมัติทุกเที่ยงคืน
+  // วันใหม่อัตโนมัติ เที่ยงคืน
   useEffect(() => {
     const tick = () => {
       const today = toDateKey();
@@ -80,7 +82,7 @@ export default function Details() {
     };
   }, []);
 
-  // โหลดรายการที่ถูกจองแล้วจาก backend
+  // โหลดสถานะจอง
   useEffect(() => {
     fetch(ENDPOINTS.taken(dateKey))
       .then((res) => res.json())
@@ -88,7 +90,6 @@ export default function Details() {
       .catch((err) => console.error("Load taken error:", err));
   }, [dateKey]);
 
-  // label เช่น 9 => "09:00 - 10:00"
   const formatHourLabel = (h) => `${h.toString().padStart(2, "0")}:00 - ${h + 1}:00`;
   const isTaken = (c, h) => taken.includes(`${c}:${h}`);
   const isSelected = (c, h) => selected.some((s) => s.court === c && s.hour === h);
@@ -145,144 +146,156 @@ export default function Details() {
     }
   };
 
+  // ปุ่มกลับหน้าแรก (fallback ถ้าไม่มี router)
+  const goHome = () => {
+    try {
+      navigate("/");
+    } catch {
+      window.location.href = "/";
+    }
+  };
+
   return (
     <div style={ui.page}>
-      <div style={ui.container}>
-        {/* ซ้าย: ตาราง */}
-        <section style={ui.left}>
-          <div style={ui.toolbar}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label htmlFor="date" style={ui.labelSm}>วันที่ (อัตโนมัติ)</label>
-              <input
-                id="date"
-                type="date"
-                value={dateKey}
-                disabled
-                readOnly
-                title="ระบบจะอัปเดตเป็นวันใหม่โดยอัตโนมัติทุกเที่ยงคืน"
-                style={{ ...ui.dateInput, background: colors.primarySoft, borderColor: colors.primary }}
-              />
-              <span style={ui.badgeNote}>ตาราง “วันนี้” • อัปเดตอัตโนมัติเที่ยงคืน</span>
-            </div>
-
-            {/* Legend สถานะ */}
-            <div style={ui.legendWrap} aria-hidden>
-              <span style={ui.legendItem}><span style={ui.dotFree} /> ว่าง</span>
-              <span style={ui.legendItem}><span style={ui.dotPicked} /> เลือกแล้ว</span>
-              <span style={ui.legendItem}><span style={ui.dotTaken} /> เต็ม</span>
-            </div>
-          </div>
-
-          {/* ตารางคอร์ต x ชั่วโมง — ไม่มีสกรอลล์ */}
-          <div style={ui.tableFrame}>
-            {/* หัวคอลัมน์ (คงที่ด้านบน) */}
-            <div style={ui.headerRow}>
-              <div style={{ ...ui.headerCell, width: 140, textAlign: "left" }}>ช่วงเวลา</div>
-              {COURTS.map((c) => (
-                <div key={c} style={ui.headerCell}>คอร์ต {c}</div>
-              ))}
-            </div>
-
-            {/* โซนบอดี้แบบ "Grid เต็มจอ" */}
-            <div
-              role="table"
-              aria-label="ตารางการจองคอร์ตแบดมินตัน"
-              style={ui.bodyNoScroll}
-            >
-              {HOURS.map((h, idx) => (
-                <div key={h} role="row" style={{ ...ui.row, ...(idx % 2 === 1 ? ui.rowAlt : null) }}>
-                  <div role="cell" style={{ ...ui.timeCell }}>{formatHourLabel(h)}</div>
-                  {COURTS.map((c) => {
-                    const takenCell = isTaken(c, h);
-                    const picked = isSelected(c, h);
-                    const label = takenCell ? "เต็ม" : picked ? "เลือกแล้ว" : "ว่าง";
-                    return (
-                      <button
-                        key={`${c}:${h}`}
-                        onClick={() => toggleCell(c, h)}
-                        disabled={takenCell}
-                        aria-pressed={picked}
-                        aria-label={`คอร์ต ${c} เวลา ${formatHourLabel(h)}: ${label}`}
-                        style={{
-                          ...ui.cellBtn,
-                          ...(takenCell ? ui.cellTaken : picked ? ui.cellPicked : ui.cellFree),
-                        }}
-                      >
-                        <span style={ui.statusPill(takenCell, picked)}>{label}</span>
-                      </button>
-                    );
-                  })}
+      {/* ✅ ตัวครอบย่อทั้งหน้า SCALE 50% และแก้ความกว้างให้พอดี */}
+      <div style={ui.scaleWrap}>
+        <div style={ui.container}>
+          {/* ซ้าย: ตาราง */}
+          <section style={ui.left}>
+            <div style={ui.toolbar}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" onClick={goHome} style={ui.backBtn} title="กลับหน้าแรก">
+                  ← กลับหน้าแรก
+                </button>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label htmlFor="date" style={ui.labelSm}>วันที่ (อัตโนมัติ)</label>
+                  <input
+                    id="date"
+                    type="date"
+                    value={dateKey}
+                    disabled
+                    readOnly
+                    title="ระบบจะอัปเดตเป็นวันใหม่โดยอัตโนมัติทุกเที่ยงคืน"
+                    style={{ ...ui.dateInput, background: colors.primarySoft, borderColor: colors.primary }}
+                  />
+                  <span style={ui.badgeNote}>ตาราง “วันนี้” • อัปเดตอัตโนมัติเที่ยงคืน</span>
                 </div>
-              ))}
-            </div>
-          </div>
-        </section>
+              </div>
 
-        {/* ขวา: สรุปการจอง */}
-        <aside style={ui.right}>
-          <div style={ui.card}>
-            <h2 style={ui.cardTitle}>สรุปการจอง</h2>
-            <div style={ui.summaryRow}><span>วันที่</span><b>{dateKey}</b></div>
-            <div style={ui.summaryRow}><span>จำนวนรายการ</span><b>{totalHours} ชั่วโมง</b></div>
-            <div style={ui.summaryRow}><span>ราคา/ชั่วโมง</span><b>{PRICE_PER_HOUR.toLocaleString()} บาท</b></div>
-            <div style={{ ...ui.summaryRow, borderTop: `1px dashed ${colors.line}`, paddingTop: 10, marginTop: 6 }}>
-              <span>รวมทั้งสิ้น</span><b style={{ color: colors.accent }}>{totalPrice.toLocaleString()} บาท</b>
+              {/* Legend สถานะ */}
+              <div style={ui.legendWrap} aria-hidden>
+                <span style={ui.legendItem}><span style={ui.dotFree} /> ว่าง</span>
+                <span style={ui.legendItem}><span style={ui.dotPicked} /> เลือกแล้ว</span>
+                <span style={ui.legendItem}><span style={ui.dotTaken} /> เต็ม</span>
+              </div>
             </div>
 
-            <div style={{ marginTop: 12 }}>
-              <label htmlFor="note" style={ui.labelSm}>หมายเหตุ (ถ้ามี)</label>
-              <textarea
-                id="note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="เช่น ต้องการคอร์ตติดผนัง / เปิดไฟเพิ่ม"
-                style={ui.textarea}
-                rows={3}
-              />
-            </div>
+            {/* ตารางคอร์ต x ชั่วโมง — ไม่มีสกรอลล์ */}
+            <div style={ui.tableFrame}>
+              {/* หัวคอลัมน์ */}
+              <div style={ui.headerRow}>
+                <div style={{ ...ui.headerCell, width: 120, textAlign: "left" }}>ช่วงเวลา</div>
+                {COURTS.map((c) => (
+                  <div key={c} style={ui.headerCell}>คอร์ต {c}</div>
+                ))}
+              </div>
 
-            <button
-              onClick={handleConfirm}
-              disabled={loading || !selected.length}
-              style={{ ...ui.confirmBtn, opacity: loading ? 0.75 : 1 }}
-            >
-              {loading ? "กำลังยืนยัน..." : "ยืนยันการจอง"}
-            </button>
-
-            {!!selected.length && (
-              <>
-                <div style={{ marginTop: 14, fontSize: 13, color: colors.muted }}>รายการที่เลือก</div>
-                <ul style={ui.selectedList}>
-                  {selected
-                    .slice()
-                    .sort((a, b) => a.court - b.court || a.hour - b.hour)
-                    .map((s, idx) => (
-                      <li key={idx} style={ui.selectedItem}>
-                        <span>คอร์ต {s.court}</span>
-                        <span>{formatHourLabel(s.hour)}</span>
+              {/* โซนบอดี้เต็มจอ */}
+              <div role="table" aria-label="ตารางการจองคอร์ตแบดมินตัน" style={ui.bodyNoScroll}>
+                {HOURS.map((h, idx) => (
+                  <div key={h} role="row" style={{ ...ui.row, ...(idx % 2 === 1 ? ui.rowAlt : null) }}>
+                    <div role="cell" style={{ ...ui.timeCell }}>{formatHourLabel(h)}</div>
+                    {COURTS.map((c) => {
+                      const takenCell = isTaken(c, h);
+                      const picked = isSelected(c, h);
+                      const label = takenCell ? "เต็ม" : picked ? "เลือกแล้ว" : "ว่าง";
+                      return (
                         <button
-                          onClick={() => toggleCell(s.court, s.hour)}
-                          style={ui.removeBtn}
-                          title="เอาออก"
+                          key={`${c}:${h}`}
+                          onClick={() => toggleCell(c, h)}
+                          disabled={takenCell}
+                          aria-pressed={picked}
+                          aria-label={`คอร์ต ${c} เวลา ${formatHourLabel(h)}: ${label}`}
+                          style={{
+                            ...ui.cellBtn,
+                            ...(takenCell ? ui.cellTaken : picked ? ui.cellPicked : ui.cellFree),
+                          }}
                         >
-                          ✕
+                          <span style={ui.statusPill(takenCell, picked)}>{label}</span>
                         </button>
-                      </li>
-                    ))}
-                </ul>
-              </>
-            )}
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
 
-            {msg && <div style={ui.message}>{msg}</div>}
-          </div>
-        </aside>
+          {/* ขวา: สรุปการจอง */}
+          <aside style={ui.right}>
+            <div style={ui.card}>
+              <h2 style={ui.cardTitle}>สรุปการจอง</h2>
+              <div style={ui.summaryRow}><span>วันที่</span><b>{dateKey}</b></div>
+              <div style={ui.summaryRow}><span>จำนวนรายการ</span><b>{totalHours} ชั่วโมง</b></div>
+              <div style={ui.summaryRow}><span>ราคา/ชั่วโมง</span><b>{PRICE_PER_HOUR.toLocaleString()} บาท</b></div>
+              <div style={{ ...ui.summaryRow, borderTop: `1px dashed ${colors.line}`, paddingTop: 10, marginTop: 6 }}>
+                <span>รวมทั้งสิ้น</span><b style={{ color: colors.accent }}>{totalPrice.toLocaleString()} บาท</b>
+              </div>
+
+              <div style={{ marginTop: 12 }}>
+                <label htmlFor="note" style={ui.labelSm}>หมายเหตุ (ถ้ามี)</label>
+                <textarea
+                  id="note"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="เช่น ต้องการคอร์ตติดผนัง / เปิดไฟเพิ่ม"
+                  style={ui.textarea}
+                  rows={2}
+                />
+              </div>
+
+              <button
+                onClick={handleConfirm}
+                disabled={loading || !selected.length}
+                style={{ ...ui.confirmBtn, opacity: loading ? 0.75 : 1 }}
+              >
+                {loading ? "กำลังยืนยัน..." : "ยืนยันการจอง"}
+              </button>
+
+              {!!selected.length && (
+                <>
+                  <div style={{ marginTop: 12, fontSize: 12, color: colors.muted }}>รายการที่เลือก</div>
+                  <ul style={ui.selectedList}>
+                    {selected
+                      .slice()
+                      .sort((a, b) => a.court - b.court || a.hour - b.hour)
+                      .map((s, idx) => (
+                        <li key={idx} style={ui.selectedItem}>
+                          <span>คอร์ต {s.court}</span>
+                          <span>{formatHourLabel(s.hour)}</span>
+                          <button
+                            onClick={() => toggleCell(s.court, s.hour)}
+                            style={ui.removeBtn}
+                            title="เอาออก"
+                          >
+                            ✕
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                </>
+              )}
+
+              {msg && <div style={ui.message}>{msg}</div>}
+            </div>
+          </aside>
+        </div>
       </div>
     </div>
   );
 }
 
-/** ===== UI styles (inline, โทนเขียวอ่อน + “เห็นครบโดยไม่ต้องเลื่อน”) ===== */
-const COLS = COURTS.length + 1; // +1 = คอลัมน์เวลา
+/** ===== UI styles (ย่อ 50% ด้วย scale + ความกว้างชดเชย) ===== */
 const ui = {
   page: {
     minHeight: "100vh",
@@ -290,15 +303,23 @@ const ui = {
     color: colors.ink,
     fontFamily:
       'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", sans-serif',
-    padding: 16,
-    overflow: "hidden",        // ❗ กันการสกรอลล์ของทั้งหน้า
+    padding: 12,
+    overflow: "hidden",
   },
+
+  // ✅ เทคนิคย่อทั้งหน้า: scale แล้วชดเชยความกว้างเพื่อไม่ให้เกิดสกรอลล์
+  scaleWrap: {
+    transform: `scale(${SCALE})`,
+    transformOrigin: "top left",
+    width: `${100 / SCALE}%`,
+  },
+
   container: {
     maxWidth: "100vw",
     margin: "0 auto",
     display: "grid",
-    gridTemplateColumns: "1fr 340px",
-    gap: 16,
+    gridTemplateColumns: "1fr 300px",
+    gap: 12,
   },
 
   /* Left */
@@ -307,15 +328,23 @@ const ui = {
     display: "flex",
     alignItems: "flex-end",
     justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 10,
+    gap: 8,
+    marginBottom: 8,
     flexWrap: "wrap",
   },
-  labelSm: { display: "block", fontSize: "clamp(11px, 1vw, 13px)", fontWeight: 700, marginBottom: 6, color: colors.muted },
+  backBtn: {
+    padding: "8px 12px",
+    borderRadius: 10,
+    border: `1px solid ${colors.lineStrong}`,
+    background: "#fff",
+    cursor: "pointer",
+    fontWeight: 700,
+  },
+  labelSm: { display: "block", fontSize: 11, fontWeight: 700, marginBottom: 4, color: colors.muted },
   badgeNote: {
     display: "inline-block",
-    fontSize: "clamp(10px, .9vw, 12px)",
-    padding: "6px 10px",
+    fontSize: 10,
+    padding: "4px 8px",
     borderRadius: 999,
     background: colors.primarySoft,
     color: colors.primaryDark,
@@ -323,11 +352,11 @@ const ui = {
     width: "fit-content",
   },
   dateInput: {
-    padding: "10px 12px",
+    padding: "8px 10px",
     border: `1px solid ${colors.line}`,
     borderRadius: 10,
     background: "#fff",
-    fontSize: "clamp(12px, 1vw, 14px)",
+    fontSize: 12,
     outline: "none",
   },
 
@@ -335,39 +364,38 @@ const ui = {
   legendWrap: {
     display: "flex",
     alignItems: "center",
-    gap: 14,
+    gap: 10,
     background: "#fff",
-    padding: "8px 12px",
+    padding: "6px 10px",
     borderRadius: 999,
     border: `1px solid ${colors.line}`,
-    boxShadow: "0 4px 18px rgba(2,6,12,.05)",
+    boxShadow: "0 3px 12px rgba(2,6,12,.05)",
     whiteSpace: "nowrap",
   },
-  legendItem: { display: "inline-flex", alignItems: "center", gap: 8, fontSize: "clamp(11px, 1vw, 13px)", color: colors.muted },
-  dotFree: { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: "#fff", border: `1px solid ${colors.lineStrong}` },
-  dotPicked: { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: colors.primary, border: `1px solid ${colors.primaryDark}` },
-  dotTaken: { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: colors.taken, border: `1px solid ${colors.lineStrong}` },
+  legendItem: { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: colors.muted },
+  dotFree: { display: "inline-block", width: 10, height: 10, borderRadius: 999, background: "#fff", border: `1px solid ${colors.lineStrong}` },
+  dotPicked: { display: "inline-block", width: 10, height: 10, borderRadius: 999, background: colors.primary, border: `1px solid ${colors.primaryDark}` },
+  dotTaken: { display: "inline-block", width: 10, height: 10, borderRadius: 999, background: colors.taken, border: `1px solid ${colors.lineStrong}` },
 
   /* กรอบตาราง */
   tableFrame: {
     background: colors.card,
     border: `1px solid ${colors.lineStrong}`,
-    borderRadius: 16,
-    boxShadow: "0 12px 30px rgba(2,6,12,0.06)",
+    borderRadius: 14,
+    boxShadow: "0 10px 24px rgba(2,6,12,0.06)",
     overflow: "hidden",
   },
 
-  /* หัวคอลัมน์ (สูงคงที่) */
   headerRow: {
     display: "grid",
-    gridTemplateColumns: `140px repeat(${COURTS.length}, 1fr)`,
+    gridTemplateColumns: `120px repeat(${COURTS.length}, 1fr)`,
     borderBottom: `1px solid ${colors.lineStrong}`,
     background: colors.primarySoft,
     boxShadow: "inset 0 -1px 0 " + colors.lineStrong,
   },
   headerCell: {
-    padding: "12px 10px",
-    fontSize: "clamp(11px, 1vw, 13px)",
+    padding: "10px 8px",
+    fontSize: 11,
     fontWeight: 900,
     textAlign: "center",
     borderLeft: `1px solid ${colors.lineStrong}`,
@@ -375,40 +403,37 @@ const ui = {
     letterSpacing: 0.2,
   },
 
-  /* โซนบอดี้ “ไม่มีสกรอลล์”: แบ่งแถวเป็น 12 ส่วนเท่า ๆ กัน ให้สูงรวม = (100vh - OFFSET) */
+  // ไม่มีสกรอลล์: แถวสูงเท่ากันรวมทั้งบล็อกพอดีจอ (หลัง scale แล้ว)
   bodyNoScroll: {
-    height: `calc(100vh - ${OFFSET_PX}px)`, // ✅ ปรับ OFFSET_PX ได้ถ้ายังไม่พอดี
+    height: `calc(100vh - ${OFFSET_PX}px)`,
     display: "grid",
     gridAutoFlow: "row",
-    gridTemplateRows: `repeat(${HOURS.length}, 1fr)`, // 12 แถวเท่ากัน
+    gridTemplateRows: `repeat(${HOURS.length}, 1fr)`,
     overflow: "hidden",
   },
 
-  /* แถว */
   row: {
     display: "grid",
-    gridTemplateColumns: `140px repeat(${COURTS.length}, 1fr)`,
+    gridTemplateColumns: `120px repeat(${COURTS.length}, 1fr)`,
     borderTop: `1px solid ${colors.line}`,
   },
   rowAlt: { background: "#fbfdfc" },
 
-  /* คอลัมน์เวลา (ซ้าย) */
   timeCell: {
-    padding: "0 10px",
+    padding: "0 8px",
     display: "flex",
     alignItems: "center",
-    fontSize: "clamp(11px, .95vw, 13px)",
+    fontSize: 11,
     textAlign: "left",
     background: "#ffffff",
     borderRight: `1px solid ${colors.lineStrong}`,
     fontWeight: 700,
   },
 
-  /* เซลล์สถานะ */
   cellBtn: {
     width: "100%",
     height: "100%",
-    fontSize: "clamp(11px, .95vw, 13px)",
+    fontSize: 11,
     background: "#fff",
     border: "none",
     borderLeft: `1px solid ${colors.line}`,
@@ -430,11 +455,10 @@ const ui = {
     cursor: "not-allowed",
   },
 
-  // แคปซูลสถานะในเซลล์
   statusPill: (isTaken, isPicked) => ({
-    fontSize: "clamp(10px, .9vw, 12px)",
+    fontSize: 10,
     fontWeight: 800,
-    padding: "6px 10px",
+    padding: "4px 8px",
     borderRadius: 999,
     border: `1px solid ${isTaken ? colors.lineStrong : isPicked ? colors.primaryDark : colors.lineStrong}`,
     background: isTaken ? "#f1f5f9" : isPicked ? "#dcfce7" : "#ffffff",
@@ -447,29 +471,29 @@ const ui = {
   card: {
     background: colors.card,
     border: `1px solid ${colors.line}`,
-    borderRadius: 16,
-    boxShadow: "0 12px 30px rgba(2,6,12,0.06)",
-    padding: 14,
+    borderRadius: 14,
+    boxShadow: "0 10px 24px rgba(2,6,12,0.06)",
+    padding: 12,
     position: "sticky",
-    top: 16,
-    maxHeight: "calc(100vh - 32px)",
-    overflow: "auto", // ให้การ์ดฝั่งขวาเลื่อนเองถ้าสูงเกิน
+    top: 12,
+    maxHeight: "calc(100vh - 24px)",
+    overflow: "auto",
   },
-  cardTitle: { margin: 0, fontSize: 18, fontWeight: 900, color: colors.primaryDark },
+  cardTitle: { margin: 0, fontSize: 16, fontWeight: 900, color: colors.primaryDark },
   summaryRow: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    fontSize: 14,
-    marginTop: 10,
+    fontSize: 12,
+    marginTop: 8,
   },
   textarea: {
     width: "100%",
-    padding: "10px 14px",
-    borderRadius: 12,
+    padding: "8px 10px",
+    borderRadius: 10,
     border: `1px solid ${colors.line}`,
     outline: "none",
-    fontSize: 14,
+    fontSize: 12,
     lineHeight: "1.5",
     background: "#fff",
     resize: "vertical",
@@ -477,18 +501,18 @@ const ui = {
   },
   confirmBtn: {
     width: "100%",
-    marginTop: 12,
-    padding: "12px 14px",
+    marginTop: 10,
+    padding: "10px 12px",
     background: colors.primaryDark,
     color: "#fff",
     border: "none",
-    borderRadius: 12,
+    borderRadius: 10,
     cursor: "pointer",
     fontWeight: 800,
-    fontSize: 15,
+    fontSize: 13,
   },
   selectedList: {
-    marginTop: 8,
+    marginTop: 6,
     listStyle: "none",
     padding: 0,
     borderTop: `1px solid ${colors.line}`,
@@ -496,10 +520,10 @@ const ui = {
   selectedItem: {
     display: "grid",
     gridTemplateColumns: "auto 1fr auto",
-    gap: 8,
+    gap: 6,
     alignItems: "center",
-    padding: "8px 0",
-    fontSize: 13,
+    padding: "6px 0",
+    fontSize: 12,
     borderBottom: `1px dashed ${colors.line}`,
   },
   removeBtn: {
@@ -510,8 +534,8 @@ const ui = {
     cursor: "pointer",
   },
   message: {
-    marginTop: 10,
-    fontSize: 14,
+    marginTop: 8,
+    fontSize: 12,
     textAlign: "center",
     color: colors.accent,
   },
