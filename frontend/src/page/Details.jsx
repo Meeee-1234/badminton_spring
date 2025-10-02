@@ -35,12 +35,25 @@ const ENDPOINTS = {
   create: `${API}/api/bookings`,
 };
 
-const toDateKey = (d = new Date()) => d.toISOString().split("T")[0];
+/** ใช้วันที่แบบ Local (แก้ปัญหา UTC คลาดวัน) */
+const toDateKey = (d = new Date()) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+/** ระยะเวลาถึงเที่ยงคืนครั้งถัดไป (Local) */
+const msUntilNextMidnightLocal = () => {
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+  return next.getTime() - now.getTime();
+};
 
 export default function Details() {
   const navigate = useNavigate();
 
-  // 🔒 วัน “วันนี้” อัตโนมัติ
+  // 🔒 วัน “วันนี้” อัตโนมัติ + เด้งเปลี่ยนเองตอนเที่ยงคืน
   const [dateKey, setDateKey] = useState(() => toDateKey());
   const [taken, setTaken] = useState([]);       // ["1:9","2:10"]
   const [mine, setMine]   = useState([]);       // ["1:9","2:10"] ของผู้ใช้
@@ -97,65 +110,46 @@ export default function Details() {
     };
   }, []);
 
-// ✅ อัปเดตเป็นวันใหม่อัตโนมัติ (ทำงานทุกเที่ยงคืน)
-useEffect(() => {
-  const updateDate = () => setDateKey(toDateKey());
+  // อัปเดตเป็นวันใหม่อัตโนมัติ "เที่ยงคืน (Local)" + กันเคส Sleep/ปลุกแท็บ
+  useEffect(() => {
+    let midnightTimer;
 
-  // ตั้งค่า dateKey ทันทีตอน component mount
-  updateDate();
+    const scheduleNext = () => {
+      clearTimeout(midnightTimer);
+      midnightTimer = setTimeout(() => {
+        const today = toDateKey(new Date());
+        setDateKey(prev => (prev !== today ? today : prev));
+        scheduleNext(); // นัดหมายเที่ยงคืนถัดไป
+      }, msUntilNextMidnightLocal());
+    };
 
-  // หาว่ากี่ ms ถึงเที่ยงคืน
-  const now = new Date();
-  const nextMidnight = new Date(now);
-  nextMidnight.setDate(now.getDate() + 1);
-  nextMidnight.setHours(0, 0, 0, 0);
-  const msToMidnight = nextMidnight.getTime() - now.getTime();
+    // sync ทันทีรอบแรก (กันเคสเปิดทิ้งไว้ข้ามวัน)
+    const todayNow = toDateKey(new Date());
+    setDateKey(prev => (prev !== todayNow ? todayNow : prev));
+    scheduleNext();
 
-  // รอจนถึงเที่ยงคืน แล้วค่อยตั้ง interval 24 ชม.
-  const midnightTimeout = setTimeout(() => {
-    updateDate();
-    const daily = setInterval(updateDate, 24 * 60 * 60 * 1000);
-    // cleanup interval
-    return () => clearInterval(daily);
-  }, msToMidnight);
-
-  return () => clearTimeout(midnightTimeout);
-}, []);
-
-// ✅ รีเซ็ตตารางเมื่อ dateKey เปลี่ยน
-useEffect(() => {
-  setTaken([]);
-  setMine([]);
-  setSelected([]);
-  setNote("");
-
-  // 🔄 โหลดข้อมูลใหม่ของวันนั้นเสมอ
-  const load = async () => {
-    try {
-      const [tRes, user] = await Promise.all([
-        fetch(ENDPOINTS.taken(dateKey)),
-        Promise.resolve(JSON.parse(localStorage.getItem("auth:user") || "{}")),
-      ]);
-      const tJson = await tRes.json();
-      setTaken(tJson.taken || []);
-
-      if (user?._id) {
-        const mRes = await fetch(ENDPOINTS.mine(dateKey, user._id));
-        if (mRes.ok) {
-          const mJson = await mRes.json();
-          setMine(mJson.mine || []);
-        }
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        const t = toDateKey(new Date());
+        setDateKey(prev => (prev !== t ? t : prev));
+        scheduleNext(); // รีเซ็ตนัดหมายให้ตรงเที่ยงคืนถัดไป
       }
-    } catch (err) {
-      console.error("Load bookings error:", err);
-    }
-  };
+    };
+    document.addEventListener("visibilitychange", onVisible);
 
-  if (dateKey) load();
-}, [dateKey]);
+    return () => {
+      clearTimeout(midnightTimer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
 
+  // เคลียร์สถานะเลือก/ข้อความเมื่อวันเปลี่ยน
+  useEffect(() => {
+    setSelected([]);
+    setMsg("");
+  }, [dateKey]);
 
-  // โหลดสถานะจอง (รวม “ของฉัน”)
+  // โหลดสถานะจอง (รวม “ของฉัน”) เมื่อวันเปลี่ยน
   useEffect(() => {
     let cancelled = false;
 
@@ -203,83 +197,78 @@ useEffect(() => {
     );
   };
 
-const handleConfirm = async () => {
-  setLoading(true);
-  setMsg("");
-  try {
-    const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
-    if (!user?._id) {
-      setMsg("❌ กรุณาเข้าสู่ระบบก่อนจอง");
-      setLoading(false);
-      return;
-    }
-
-    for (const s of selected) {
-      const res = await fetch(ENDPOINTS.create, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user._id,
-          date: dateKey,
-          court: s.court,
-          hour: s.hour,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setMsg(`❌ จองคอร์ต ${s.court} เวลา ${formatHourLabel(s.hour)} ไม่สำเร็จ: ${data.error || "unknown"}`);
+  const handleConfirm = async () => {
+    setLoading(true);
+    setMsg("");
+    try {
+      const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
+      if (!user?._id) {
+        setMsg("❌ กรุณาเข้าสู่ระบบก่อนจอง");
         setLoading(false);
         return;
       }
-    }
 
-    // ✅ อัพเดต state ให้กลายเป็นสีเขียวทันที
-    setMsg("✅ จองสำเร็จ!");
-    setMine((prev) => [
-      ...prev,
-      ...selected.map((s) => `${s.court}:${s.hour}`)
-    ]);
-    setTaken((prev) => [
-      ...prev,
-      ...selected.map((s) => `${s.court}:${s.hour}`)
-    ]);
-    setSelected([]);
-    setNote("");
-
-    // ✅ reload อีกครั้งเพื่อ sync ให้ตรง server
-    try {
-      const [tRes, mRes] = await Promise.all([
-        fetch(ENDPOINTS.taken(dateKey)),
-        (async () => {
-          const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
-          if (!user?._id) return null;
-          const r = await fetch(ENDPOINTS.mine(dateKey, user._id));
-          return r.ok ? r : null;
-        })(),
-      ]);
-
-      const tJson = await tRes.json();
-      setTaken(tJson.taken || []);
-      if (mRes) {
-        const mJson = await mRes.json();
-        setMine(mJson.mine || []);
+      for (const s of selected) {
+        const res = await fetch(ENDPOINTS.create, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: user._id,
+            date: dateKey,
+            court: s.court,
+            hour: s.hour,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setMsg(`❌ จองคอร์ต ${s.court} เวลา ${formatHourLabel(s.hour)} ไม่สำเร็จ: ${data.error || "unknown"}`);
+          setLoading(false);
+          return;
+        }
       }
+
+      // ✅ อัพเดต state ให้กลายเป็นสีเขียวทันที
+      setMsg("✅ จองสำเร็จ!");
+      setMine((prev) => [
+        ...prev,
+        ...selected.map((s) => `${s.court}:${s.hour}`)
+      ]);
+      setTaken((prev) => [
+        ...prev,
+        ...selected.map((s) => `${s.court}:${s.hour}`)
+      ]);
+      setSelected([]);
+      setNote("");
+
+      // ✅ reload เพื่อ sync กับ server
+      try {
+        const [tRes, mRes] = await Promise.all([
+          fetch(ENDPOINTS.taken(dateKey)),
+          (async () => {
+            const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
+            if (!user?._id) return null;
+            const r = await fetch(ENDPOINTS.mine(dateKey, user._id));
+            return r.ok ? r : null;
+          })(),
+        ]);
+
+        const tJson = await tRes.json();
+        setTaken(tJson.taken || []);
+        if (mRes) {
+          const mJson = await mRes.json();
+          setMine(mJson.mine || []);
+        }
+      } catch (err) {
+        console.error("reload error:", err);
+      }
+
     } catch (err) {
-      console.error("reload error:", err);
+      console.error("Booking error:", err);
+      setMsg("❌ Server error");
+    } finally {
+      setLoading(false);
     }
-
-  } catch (err) {
-    console.error("Booking error:", err);
-    setMsg("❌ Server error");
-  } finally {
-    setLoading(false);
-  }
-};
-
-
-  
-
-  
+  };
 
   const goHome = () => {
     try { navigate("/"); } catch { window.location.href = "/"; }
@@ -299,6 +288,7 @@ const handleConfirm = async () => {
                 </button>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <label htmlFor="date" style={ui.labelSm}>วันที่ (อัตโนมัติ)</label>
+                  {/* แสดงผลอย่างเดียว — เด้งเป็นวันใหม่ตอนเที่ยงคืน */}
                   <input
                     id="date"
                     type="date"
@@ -344,7 +334,6 @@ const handleConfirm = async () => {
                         takenCell ? (mineCell ? ui.cellMine : ui.cellTaken)
                                   : (picked ? ui.cellPicked : ui.cellFree);
 
-                      // ✅ ของฉัน: ไม่ใช้ disabled จริง เพื่อไม่ให้ซีด แต่กันกดด้วย pointerEvents
                       const commonBtnStyle = { ...ui.cellBtn, ...styleForCell };
                       const btnProps = mineCell
                         ? { disabled: false, "aria-disabled": true, style: { ...commonBtnStyle, ...ui.mineNoDim } }
@@ -612,7 +601,7 @@ const ui = {
       : colors.lineStrong
     }`,
     background: isMine
-      ? "#22c55e" // เขียวชัด (tailwind: green-400)
+      ? "#22c55e" // เขียวชัด
       : (isTaken
           ? "#f1f5f9"
           : isPicked

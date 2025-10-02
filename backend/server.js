@@ -422,6 +422,22 @@ app.get("/api/profile/:userId", async (req, res) => {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // ---------- Start Server ----------
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);

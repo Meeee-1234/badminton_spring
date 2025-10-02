@@ -130,7 +130,7 @@ export default function AdminManagement() {
     >
       ← กลับหน้าแรก
     </button>
-    
+
         <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 20, textAlign: "center" }}>
           📊 Admin Management
         </h1>
@@ -225,66 +225,87 @@ export default function AdminManagement() {
         </div>
       </section>
 
-      {/* Bookings Table */}
-      <section style={{ marginBottom: 40 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>📝 Bookings</h2>
-        <div
-          style={{
-            overflowX: "auto",
-            background: "#fff",
-            borderRadius: 10,
-            boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
-          }}
-        >
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                {["#", "User", "Date", "Court", "Hour", "Status"].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      padding: 12,
-                      background: "#10b981",
-                      color: "#fff",
-                      textAlign: "left",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {bookings.length > 0 ? (
-                bookings.map((b, index) => (
-                  <tr key={b._id}>
-                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{index + 1}</td>
-                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{b.user?.name || "-"}</td>
-                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{b.date}</td>
-                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{b.court}</td>
-                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
-                      {`${b.hour}:00 - ${b.hour + 1}:00`}
-                    </td>
-                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
-                      {b.status === "booked" && "📌 จองแล้ว"}
-                      {b.status === "arrived" && "✅ มาแล้ว"}
-                      {b.status === "canceled" && "❌ ยกเลิก"}
-                      {!b.status && "-"}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: "center", color: "#9ca3af", padding: 10 }}>
-                    ไม่มีข้อมูลการจอง
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+{/* Bookings Table */}
+<section style={{ marginBottom: 40 }}>
+  <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>📝 Bookings</h2>
+  <div
+    style={{
+      overflowX: "auto",
+      background: "#fff",
+      borderRadius: 10,
+      boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
+    }}
+  >
+    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <thead>
+        <tr>
+          {["ID", "User", "Date", "Court", "Hour", "Status"].map((h) => (
+            <th
+              key={h}
+              style={{
+                padding: 12,
+                background: "#10b981",
+                color: "#fff",
+                textAlign: "center",
+                fontWeight: 600,
+              }}
+            >
+              {h}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {bookings.length > 0 ? (
+          bookings.map((b, index) => (
+            <tr key={b._id}>
+              <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>
+                {index + 1}
+              </td>
+              <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>
+                {b.user?.name || "-"}
+              </td>
+              <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>
+                {b.date}
+              </td>
+              <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>
+                {b.court}
+              </td>
+              <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>
+                {`${b.hour}:00 - ${b.hour + 1}:00`}
+              </td>
+              <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>
+                <span
+                  style={{
+                    display: "inline-block",
+                    padding: "4px 10px",
+                    borderRadius: 12,
+                    backgroundColor: "#bfdbfe", // ฟ้าอ่อน
+                    color: "#1e3a8a", // ฟ้าเข้ม
+                    fontWeight: 600,
+                    textAlign: "center",
+                    minWidth: 60,
+                  }}
+                >
+                  {b.status === "booked" && "จองแล้ว"}
+                  {b.status === "arrived" && "มาแล้ว"}
+                  {b.status === "canceled" && "ยกเลิก"}
+                  {!b.status && "-"}
+                </span>
+              </td>
+            </tr>
+          ))
+        ) : (
+          <tr>
+            <td colSpan={6} style={{ textAlign: "center", color: "#9ca3af", padding: 10 }}>
+              ไม่มีข้อมูลการจอง
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+</section>
     </div>
   );
 }
