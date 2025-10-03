@@ -8,7 +8,6 @@ export default function AdminManagement() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-  const [authorized, setAuthorized] = useState(false); // ✅ เช็คสิทธิ์
   const navigate = useNavigate();
 
   // ✅ Logout
@@ -42,10 +41,10 @@ export default function AdminManagement() {
       if (!res.ok) throw new Error(data.error || "ลบผู้ใช้ไม่สำเร็จ");
 
       setUsers((prev) => prev.filter((u) => u._id !== id));
-      setMessage("✅ " + data.message);
+      alert("✅ " + data.message);
     } catch (err) {
       console.error("❌ Delete user error:", err);
-      setMessage("❌ " + err.message);
+      alert("❌ " + err.message);
     }
   };
 
@@ -55,13 +54,10 @@ export default function AdminManagement() {
     const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
 
     if (!token || user.role !== "admin") {
-      setMessage("❌ คุณไม่มีสิทธิ์การเข้าถึงหน้านี้ (Admin เท่านั้น)");
-      setAuthorized(false);
-      setLoading(false);
+      alert("❌ คุณไม่มีสิทธิ์การเข้าถึงหน้านี้ (Admin เท่านั้น)");
+      navigate("/"); 
       return;
     }
-
-    setAuthorized(true);
 
     async function fetchData() {
       try {
@@ -93,37 +89,10 @@ export default function AdminManagement() {
     }
 
     fetchData();
-  }, []);
+  }, [navigate]);
 
   if (loading) return <p>⏳ กำลังโหลด...</p>;
 
-  // ❌ ถ้าไม่ใช่แอดมิน -> โชว์ข้อความแทน
-  if (!authorized) {
-    return (
-      <div style={{ padding: 20, fontFamily: "Segoe UI, sans-serif", background: "#fef2f2", minHeight: "100vh" }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: "#b91c1c" }}>
-          {message || "❌ คุณไม่มีสิทธิ์การเข้าถึงหน้านี้"}
-        </h1>
-        <button
-          onClick={() => navigate("/")}
-          style={{
-            marginTop: 20,
-            padding: "8px 16px",
-            borderRadius: 8,
-            border: "1px solid #ef4444",
-            background: "#fff",
-            color: "#b91c1c",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          ← กลับหน้าแรก
-        </button>
-      </div>
-    );
-  }
-
-  // ✅ ถ้าเป็นแอดมิน -> แสดงหน้าเต็ม
   return (
     <div style={{ padding: 20, fontFamily: "Segoe UI, sans-serif", background: "#f9fafb", minHeight: "100vh" }}>
       {/* Header */}

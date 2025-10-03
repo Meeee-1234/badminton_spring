@@ -221,6 +221,7 @@ app.get("/api/users", async (req, res) => {
   }
 });
 
+
 // 📄 Login
 app.post("/api/auth/login", async (req, res) => {
   try {
@@ -231,8 +232,14 @@ app.post("/api/auth/login", async (req, res) => {
     }
 
     const user = await User.findOne({ email });
+
     if (!user) {
       return res.status(401).json({ error: "ไม่พบบัญชีนี้" });
+    }
+
+    // ✅ ถ้าโดน Soft Delete → ห้ามเข้า
+    if (user.isDeleted) {
+      return res.status(403).json({ error: "บัญชีนี้ถูกปิดการใช้งาน" });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -240,7 +247,6 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(401).json({ error: "รหัสผ่านไม่ถูกต้อง" });
     }
 
-    // ✅ ฝัง role เข้า token ด้วย
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET || "supersecret",
@@ -339,36 +345,35 @@ app.get("/api/bookings/taken", async (req, res) => {
   }
 });
 
-// ✅ จองสนามใหม่
-app.post("/api/bookings", async (req, res) => {
+// ✅ จองสนามใหม่ (ต้อง login)
+app.post("/api/bookings", authRequired, async (req, res) => {
   try {
-    const { userId, date, court, hour, note } = req.body;
-    if (!userId || !date || court == null || hour == null) {
-      return res.status(400).json({ error: "ต้องส่ง userId, date, court, hour" });
+    const { date, court, hour, note } = req.body;
+    const userId = req.user._id; // เอาจาก token โดยตรง ไม่ต้องให้ client ส่ง
+
+    if (!date || court == null || hour == null) {
+      return res.status(400).json({ error: "ต้องส่ง date, court, hour" });
     }
 
-    // กันไม่ให้ซ้ำ
     const exists = await Booking.findOne({ date, court, hour });
     if (exists) {
       return res.status(409).json({ error: "ช่วงเวลานี้ถูกจองแล้ว" });
     }
 
-    const booking = await Booking.create({ 
-      user: userId, 
-      date, 
-      court, 
-      hour, 
+    const booking = await Booking.create({
+      user: userId,
+      date,
+      court,
+      hour,
       note,
-      status: "booked"   // ✅ default เวลาจองใหม่
+      status: "booked"
     });
 
     res.status(201).json({ message: "จองสำเร็จ", booking });
   } catch (err) {
-    console.error("❌ Booking error:", err.message);
     res.status(500).json({ error: "Server error" });
   }
 });
-
 
 // ✅ ดูการจองของ user ตามวัน
 app.get("/api/bookings/my/:userId/:date", async (req, res) => {

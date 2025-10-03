@@ -7,6 +7,7 @@ import Profile from "./page/Profile";
 import Details from "./page/Details";
 import AdminManagement from './page/AdminManagement';
 import AdminDetails from './page/AdminDetails';
+import UsersTest from './page/UsersTest';
 
 
 export default function App() {
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="/details" element={<Details />} />
         <Route path="/adminmanagement" element={<AdminManagement />} />
         <Route path="/admindetails" element={<AdminDetails />} />
+        <Route path="/userstest" element={<UsersTest />} />
       </Routes>
     </div>
   );

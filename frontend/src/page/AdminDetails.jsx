@@ -32,14 +32,38 @@ const toDateKey = (d = new Date()) => {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 };
-const timeLabel = (h) => `${String(h).padStart(2, "0")}:00 - ${String(h + 1).padStart(2, "0")}:00`;
+const timeLabel = (h) =>
+  `${String(h).padStart(2, "0")}:00 - ${String(h + 1).padStart(2, "0")}:00`;
 
 const ENDPOINTS = {
   list: (date) => `${API}/api/admin/bookings?date=${encodeURIComponent(date)}`,
   setStatus: (id) => `${API}/api/admin/bookings/${id}/status`,
-  update: (id) => `${API}/api/admin/bookings/${id}`,
-  remove: (id) => `${API}/api/admin/bookings/${id}`,
 };
+
+/* ================ NORMALIZERS ================ */
+function normalizeStatus(raw) {
+  const v = String(raw || "").toLowerCase();
+  if (v === "checked_in" || v === "arrived") return "checked_in";
+  if (v === "cancelled" || v === "canceled") return "cancelled";
+  return "booked";
+}
+function normalizeOne(b) {
+  return {
+    _id: b._id || b.id,
+    court: Number(b.court),
+    hour: Number(b.hour),
+    status: normalizeStatus(b.status),
+    userName: b.userName || b.username || b.name || b.user?.name || "-",
+    note: b.note || "",
+    date: b.date || b.bookingDate || null,
+  };
+}
+function pickListShape(data) {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.bookings)) return data.bookings;
+  if (Array.isArray(data?.items)) return data.items;
+  return [];
+}
 
 /* ================ MAIN ================= */
 export default function AdminDetails() {
@@ -51,26 +75,41 @@ export default function AdminDetails() {
   const [msg, setMsg] = useState("");
   const [filter, setFilter] = useState("all"); // all | booked | checked_in | cancelled
 
-  // modal state (edit)
-  const [editOpen, setEditOpen] = useState(false);
-  const [editSaving, setEditSaving] = useState(false);
-  const [editForm, setEditForm] = useState({ _id: "", userName: "", note: "" });
-
+  // ===== ดึงข้อมูลการจอง (เฉพาะวันที่เลือก) =====
   useEffect(() => {
+    let aborted = false;
     (async () => {
       setLoading(true);
       setMsg("");
       try {
-        const res = await fetch(ENDPOINTS.list(dateKey), { cache: "no-store" });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "โหลดข้อมูลล้มเหลว");
-        setBookings(data || []);
+        const token = localStorage.getItem("auth:token");
+        const res = await fetch(ENDPOINTS.list(dateKey), {
+          cache: "no-store",
+          headers: {
+            Accept: "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          // ถ้า backend ใช้คุกกี้ session ให้เปิดบรรทัดนี้:
+          // credentials: "include",
+        });
+
+        const text = await res.text();
+        let data = null;
+        try { data = JSON.parse(text); } catch { /* not JSON */ }
+
+        if (!res.ok) {
+          throw new Error(`[${res.status}] ${data?.error || text || "โหลดข้อมูลล้มเหลว"}`);
+        }
+
+        const list = pickListShape(data).map(normalizeOne);
+        if (!aborted) setBookings(list);
       } catch (e) {
-        setMsg("❌ โหลดข้อมูลไม่สำเร็จ");
+        if (!aborted) setMsg(`❌ โหลดข้อมูลไม่สำเร็จ: ${e.message || String(e)}`);
       } finally {
-        setLoading(false);
+        if (!aborted) setLoading(false);
       }
     })();
+    return () => { aborted = true; };
   }, [dateKey]);
 
   const bookingsMap = useMemo(() => {
@@ -94,58 +133,22 @@ export default function AdminDetails() {
 
   const setStatus = async (id, next) => {
     try {
+      const token = localStorage.getItem("auth:token");
       const res = await fetch(ENDPOINTS.setStatus(id), {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ status: next }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "อัปเดตไม่สำเร็จ");
+      const text = await res.text();
+      let data = null; try { data = JSON.parse(text); } catch {}
+      if (!res.ok) throw new Error(data?.error || text || "อัปเดตไม่สำเร็จ");
       setBookings((prev) => prev.map((b) => (b._id === id ? { ...b, status: next } : b)));
       setMsg("✅ อัปเดตสำเร็จ");
-    } catch {
-      setMsg("❌ อัปเดตไม่สำเร็จ");
-    }
-  };
-
-  const removeBooking = async (id) => {
-    if (!window.confirm("ยืนยันลบรายการนี้?")) return;
-    try {
-      const res = await fetch(ENDPOINTS.remove(id), { method: "DELETE" });
-      if (!res.ok) throw new Error();
-      setBookings((prev) => prev.filter((b) => b._id !== id));
-      setMsg("🗑️ ลบสำเร็จ");
-    } catch {
-      setMsg("❌ ลบไม่สำเร็จ");
-    }
-  };
-
-  const openEdit = (b) => {
-    setEditForm({ _id: b._id, userName: b.userName || "", note: b.note || "" });
-    setEditOpen(true);
-  };
-  const saveEdit = async () => {
-    setEditSaving(true);
-    setMsg("");
-    try {
-      const res = await fetch(ENDPOINTS.update(editForm._id), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userName: editForm.userName.trim(), note: editForm.note.trim() }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "บันทึกไม่สำเร็จ");
-      setBookings((prev) =>
-        prev.map((b) =>
-          b._id === editForm._id ? { ...b, userName: editForm.userName, note: editForm.note } : b
-        )
-      );
-      setEditOpen(false);
-      setMsg("✅ แก้ไขสำเร็จ");
-    } catch {
-      setMsg("❌ แก้ไขไม่สำเร็จ");
-    } finally {
-      setEditSaving(false);
+    } catch (e) {
+      setMsg(`❌ อัปเดตไม่สำเร็จ: ${e.message || String(e)}`);
     }
   };
 
@@ -154,16 +157,16 @@ export default function AdminDetails() {
       {/* Header */}
       <div style={sx.header}>
         <div style={sx.leftTools}>
-          <button onClick={() => navigate("/")} style={sx.btnGhost}>← กลับหน้าแรก</button>
+          <button onClick={() => navigate("/")} style={sx.btnGhost}>
+            ← กลับหน้าแรก
+          </button>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <label htmlFor="date" style={sx.label}>วันที่</label>
             <input
               id="date"
               type="date"
               value={dateKey}
-              onChange={(e) => {
-                if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) setDateKey(e.target.value);
-              }}
+              onChange={(e) => /^\d{4}-\d{2}-\d{2}$/.test(e.target.value) && setDateKey(e.target.value)}
               style={sx.input}
             />
           </div>
@@ -204,10 +207,7 @@ export default function AdminDetails() {
             {HOURS.map((h, idx) => (
               <div
                 key={h}
-                style={{
-                  ...sx.tr,
-                  background: idx % 2 ? "#fbfdfc" : "#fff",
-                }}
+                style={{ ...sx.tr, background: idx % 2 ? "#fbfdfc" : "#fff" }}
               >
                 <div style={{ ...sx.tdTime }}>{timeLabel(h)}</div>
                 {COURTS.map((c) => {
@@ -222,27 +222,40 @@ export default function AdminDetails() {
                   const st = statusBadge(b.status);
                   return (
                     <div key={c} style={sx.td}>
+                      {/* ชื่อ + สถานะ */}
                       <div style={sx.rowBetween}>
-                        <span style={sx.name}>{b.userName || "ไม่ระบุชื่อ"}</span>
-                        <span style={{ ...sx.badge, background: st.bg, borderColor: st.bd, color: st.ink }}>
+                        <span style={sx.name} title={b.userName || "ไม่ระบุชื่อ"}>
+                          {b.userName || "ไม่ระบุชื่อ"}
+                        </span>
+                        <span
+                          style={{
+                            ...sx.badge,
+                            background: st.bg,
+                            borderColor: st.bd,
+                            color: st.ink,
+                          }}
+                        >
                           {st.label}
                         </span>
                       </div>
 
-                      {b.note ? <div style={sx.note}>หมายเหตุ: {b.note}</div> : null}
-
+                      {/* ปุ่มเปลี่ยนสถานะ */}
                       <div style={sx.btnRow}>
-                        <button style={sx.btnPrimary} onClick={() => setStatus(b._id, "checked_in")} disabled={b.status === "checked_in"}>
+                        <button
+                          style={sx.btnPrimary}
+                          onClick={() => setStatus(b._id, "checked_in")}
+                          disabled={b.status === "checked_in"}
+                          title="เปลี่ยนเป็น มาแล้ว"
+                        >
                           ✓ มาแล้ว
                         </button>
-                        <button style={sx.btnWarn} onClick={() => setStatus(b._id, "cancelled")} disabled={b.status === "cancelled"}>
+                        <button
+                          style={sx.btnWarn}
+                          onClick={() => setStatus(b._id, "cancelled")}
+                          disabled={b.status === "cancelled"}
+                          title="เปลี่ยนเป็น ยกเลิก"
+                        >
                           ⨯ ยกเลิก
-                        </button>
-                        <button style={sx.btnGhost} onClick={() => openEdit(b)}>
-                          ✎ แก้ไข
-                        </button>
-                        <button style={sx.btnGhost} onClick={() => removeBooking(b._id)}>
-                          🗑️ ลบ
                         </button>
                       </div>
                     </div>
@@ -257,7 +270,9 @@ export default function AdminDetails() {
         <aside style={sx.cardSide}>
           <div style={sx.sideHead}>
             <h3 style={sx.sideTitle}>รายการ {dateKey}</h3>
-            <div style={{ color: C.muted, fontSize: 13 }}>ทั้งหมด <b>{filtered.length}</b> รายการ</div>
+            <div style={{ color: C.muted, fontSize: 13 }}>
+              ทั้งหมด <b>{filtered.length}</b> รายการ
+            </div>
           </div>
 
           <div style={{ display: "grid", gap: 10 }}>
@@ -275,27 +290,40 @@ export default function AdminDetails() {
                     <div key={b._id} style={sx.sideItem}>
                       <div style={sx.rowBetween}>
                         <div>
-                          <div style={{ fontWeight: 900 }}>{b.userName || "ไม่ระบุชื่อ"}</div>
+                          <div style={{ fontWeight: 900 }}>
+                            {b.userName || "ไม่ระบุชื่อ"}
+                          </div>
                           <div style={{ color: C.muted, fontSize: 13 }}>
                             คอร์ต {b.court} • {timeLabel(b.hour)}
                           </div>
                         </div>
-                        <span style={{ ...sx.badge, background: st.bg, borderColor: st.bd, color: st.ink }}>
+                        <span
+                          style={{
+                            ...sx.badge,
+                            background: st.bg,
+                            borderColor: st.bd,
+                            color: st.ink,
+                          }}
+                        >
                           {st.label}
                         </span>
                       </div>
 
-                      {b.note ? <div style={sx.note}>หมายเหตุ: {b.note}</div> : null}
-
                       <div style={sx.btnRow}>
-                        <button style={sx.btnPrimary} onClick={() => setStatus(b._id, "checked_in")} disabled={b.status === "checked_in"}>
+                        <button
+                          style={sx.btnPrimary}
+                          onClick={() => setStatus(b._id, "checked_in")}
+                          disabled={b.status === "checked_in"}
+                        >
                           ✓ มาแล้ว
                         </button>
-                        <button style={sx.btnWarn} onClick={() => setStatus(b._id, "cancelled")} disabled={b.status === "cancelled"}>
+                        <button
+                          style={sx.btnWarn}
+                          onClick={() => setStatus(b._id, "cancelled")}
+                          disabled={b.status === "cancelled"}
+                        >
                           ⨯ ยกเลิก
                         </button>
-                        <button style={sx.btnGhost} onClick={() => openEdit(b)}>✎ แก้ไข</button>
-                        <button style={sx.btnGhost} onClick={() => removeBooking(b._id)}>🗑️ ลบ</button>
                       </div>
                     </div>
                   );
@@ -306,43 +334,6 @@ export default function AdminDetails() {
           {msg && <div style={sx.msg}>{msg}</div>}
         </aside>
       </div>
-
-      {/* Modal Edit */}
-      {editOpen && (
-        <div style={sx.backdrop} onClick={() => setEditOpen(false)}>
-          <div style={sx.modal} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: 0, color: C.primary }}>แก้ไขข้อมูลผู้จอง</h3>
-            <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
-              <div>
-                <label style={sx.label}>ชื่อผู้จอง</label>
-                <input
-                  type="text"
-                  value={editForm.userName}
-                  onChange={(e) => setEditForm((f) => ({ ...f, userName: e.target.value }))}
-                  placeholder="เช่น วัฒนพงศ์ วิชาโคตร"
-                  style={sx.input}
-                />
-              </div>
-              <div>
-                <label style={sx.label}>หมายเหตุ</label>
-                <textarea
-                  rows={3}
-                  value={editForm.note}
-                  onChange={(e) => setEditForm((f) => ({ ...f, note: e.target.value }))}
-                  placeholder="ข้อมูลเพิ่มเติม เช่น เบอร์ติดต่อ ฯลฯ"
-                  style={{ ...sx.input, resize: "vertical" }}
-                />
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
-              <button style={sx.btnGhost} onClick={() => setEditOpen(false)}>ยกเลิก</button>
-              <button style={sx.btnPrimary} onClick={saveEdit} disabled={editSaving}>
-                {editSaving ? "กำลังบันทึก..." : "บันทึก"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -482,7 +473,6 @@ const sx = {
     textOverflow: "ellipsis",
   },
   rowBetween: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  note: { fontSize: 12, color: C.muted, marginTop: 4 },
 
   badge: {
     fontSize: 12,
@@ -504,7 +494,12 @@ const sx = {
     maxHeight: "calc(100vh - 32px)",
     overflow: "auto",
   },
-  sideHead: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 },
+  sideHead: {
+    display: "flex",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
   sideTitle: { margin: 0, color: C.primary, fontSize: 18 },
 
   sideItem: {
@@ -519,26 +514,5 @@ const sx = {
     textAlign: "center",
     color: C.primary,
     fontWeight: 700,
-  },
-
-  /* Modal */
-  backdrop: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(2,6,12,0.45)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 12,
-    zIndex: 50,
-  },
-  modal: {
-    width: "100%",
-    maxWidth: 520,
-    background: "#fff",
-    borderRadius: 16,
-    border: `1px solid ${C.line2}`,
-    boxShadow: "0 20px 60px rgba(2,6,12,.2)",
-    padding: 16,
   },
 };
