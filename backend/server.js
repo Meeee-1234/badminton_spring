@@ -106,6 +106,28 @@ function isAdmin(req, res, next) {
   }
 }
 
+
+// ✅ ตรวจสอบ user ที่ login + ไม่ถูกลบ
+function authRequired(req, res, next) {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "Unauthorized" });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "supersecret");
+
+    User.findById(decoded.id).then(user => {
+      if (!user || user.isDeleted) {
+        return res.status(403).json({ error: "บัญชีนี้ถูกปิดการใช้งาน" });
+      }
+      req.user = user; // เก็บ user ไว้ใช้ใน route
+      next();
+    });
+  } catch (err) {
+    res.status(401).json({ error: "Invalid token" });
+  }
+}
+
+
 // ---------- Admin Routes ----------
 app.get("/api/admin/users", isAdmin, async (req, res) => {
   try {
@@ -126,20 +148,30 @@ app.get("/api/admin/users", isAdmin, async (req, res) => {
 
 app.get("/api/admin/bookings", isAdmin, async (req, res) => {
   try {
-    const bookings = await Booking.find().populate("user", "name email");
+    const { date } = req.query; // 👈 1. ดึงค่า 'date' จาก query parameter
+
+    // 2. สร้าง object สำหรับการกรองข้อมูลในฐานข้อมูล
+    const filter = {};
+    if (date) {
+      filter.date = date; // ถ้ามี date ให้เพิ่มเงื่อนไขการกรอง
+    }
+
+    // 3. ใช้ filter ในคำสั่ง find()
+    const bookings = await Booking.find(filter).populate("user", "name email");
+
     const formatted = bookings.map((b) => ({
       _id: b._id,
-      user: b.user ? { name: b.user.name, email: b.user.email } : null,
+      userName: b.user?.name || "-",
       date: b.date,
       court: b.court,
       hour: b.hour,
-      // status: "booked"
       status: b.status,
       createdAt: new Date(b.createdAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }),
       updatedAt: new Date(b.updatedAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })
     }));
     res.json({ bookings: formatted });
   } catch (err) {
+    console.error("❌ Failed to fetch bookings:", err.message);
     res.status(500).json({ error: "Failed to fetch bookings" });
   }
 });
@@ -345,35 +377,32 @@ app.get("/api/bookings/taken", async (req, res) => {
   }
 });
 
-// ✅ จองสนามใหม่ (ต้อง login)
+// ✅ จองสนาม (ต้อง login)
 app.post("/api/bookings", authRequired, async (req, res) => {
-  try {
-    const { date, court, hour, note } = req.body;
-    const userId = req.user._id; // เอาจาก token โดยตรง ไม่ต้องให้ client ส่ง
+  const { date, court, hour, note } = req.body;
+  const userId = req.user._id; // ใช้จาก token
 
-    if (!date || court == null || hour == null) {
-      return res.status(400).json({ error: "ต้องส่ง date, court, hour" });
-    }
-
-    const exists = await Booking.findOne({ date, court, hour });
-    if (exists) {
-      return res.status(409).json({ error: "ช่วงเวลานี้ถูกจองแล้ว" });
-    }
-
-    const booking = await Booking.create({
-      user: userId,
-      date,
-      court,
-      hour,
-      note,
-      status: "booked"
-    });
-
-    res.status(201).json({ message: "จองสำเร็จ", booking });
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
+  if (!date || court == null || hour == null) {
+    return res.status(400).json({ error: "ต้องส่ง date, court, hour" });
   }
+
+  const exists = await Booking.findOne({ date, court, hour });
+  if (exists) {
+    return res.status(409).json({ error: "ช่วงเวลานี้ถูกจองแล้ว" });
+  }
+
+  const booking = await Booking.create({
+    user: userId,
+    date,
+    court,
+    hour,
+    note,
+    status: "booked"
+  });
+
+  res.status(201).json({ message: "จองสำเร็จ", booking });
 });
+
 
 // ✅ ดูการจองของ user ตามวัน
 app.get("/api/bookings/my/:userId/:date", async (req, res) => {
@@ -440,30 +469,30 @@ app.get("/api/profile/:userId", async (req, res) => {
 
 
 // ✅ Update booking status (Admin only)
-app.patch("/api/admin/bookings/:id/status", isAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
+app.put("/api/admin/bookings/:id/status", isAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
 
-    if (!["booked", "arrived", "canceled"].includes(status)) {
-      return res.status(400).json({ error: "สถานะไม่ถูกต้อง" });
-    }
+    if (!["booked", "arrived", "canceled"].includes(status)) {
+      return res.status(400).json({ error: "สถานะไม่ถูกต้อง" });
+    }
 
-    const booking = await Booking.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true }
-    ).populate("user", "name email");
+    const booking = await Booking.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true }
+    ).populate("user", "name email");
 
-    if (!booking) {
-      return res.status(404).json({ error: "ไม่พบการจอง" });
-    }
+    if (!booking) {
+      return res.status(404).json({ error: "ไม่พบการจอง" });
+    }
 
-    res.json({ message: "อัพเดตสถานะเรียบร้อย", booking });
-  } catch (err) {
-    console.error("❌ Update booking status error:", err.message);
-    res.status(500).json({ error: "Server error" });
-  }
+    res.json({ message: "อัพเดตสถานะเรียบร้อย", booking });
+  } catch (err) {
+    console.error("❌ Update booking status error:", err.message);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 
