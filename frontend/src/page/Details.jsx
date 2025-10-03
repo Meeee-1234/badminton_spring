@@ -210,18 +210,24 @@ export default function Details() {
   }, [loadTakenMine]);
 
   const formatHourLabel = (h) => `${h.toString().padStart(2, "0")}:00 - ${h + 1}:00`;
-  const isTaken = (c, h) => taken.includes(`${c}:${h}`);
+  const getStatus = (c, h) => {
+  const cell = taken.find(t => t.key === `${c}:${h}`);
+  return cell ? cell.status : null; // คืนค่า "booked" หรือ "arrived"
+};
+
   const isMine  = (c, h) => mine.includes(`${c}:${h}`);
   const isSelected = (c, h) => selected.some((s) => s.court === c && s.hour === h);
 
-  const toggleCell = (c, h) => {
-    if (isTaken(c, h)) return; // ช่องจองแล้วคลิกไม่ได้
-    setSelected((prev) =>
-      prev.some((s) => s.court === c && s.hour === h)
-        ? prev.filter((s) => !(s.court === c && s.hour === h))
-        : [...prev, { court: c, hour: h }]
-    );
-  };
+ const toggleCell = (c, h) => {
+  const status = getStatus(c, h);
+  if (status === "arrived" || status === "booked") return; // ❌ กันไม่ให้เลือกถ้าเต็ม
+  setSelected((prev) =>
+    prev.some((s) => s.court === c && s.hour === h)
+      ? prev.filter((s) => !(s.court === c && s.hour === h))
+      : [...prev, { court: c, hour: h }]
+  );
+};
+
 
   const handleConfirm = async () => {
     setLoading(true);
@@ -352,31 +358,43 @@ export default function Details() {
                   <div key={h} role="row" style={{ ...ui.row, ...(idx % 2 === 1 ? ui.rowAlt : null) }}>
                     <div role="cell" style={{ ...ui.timeCell }}>{formatHourLabel(h)}</div>
                     {COURTS.map((c) => {
-                      const takenCell = isTaken(c, h);
-                      const mineCell  = isMine(c, h);
-                      const picked    = isSelected(c, h);
+  const status   = getStatus(c, h);   // ⬅️ ใช้แทน isTaken
+  const mineCell = isMine(c, h);
+  const picked   = isSelected(c, h);
 
-                      const label = takenCell ? (mineCell ? "ของฉัน" : "เต็ม") : (picked ? "เลือกแล้ว" : "ว่าง");
-                      const styleForCell =
-                        takenCell ? (mineCell ? ui.cellMine : ui.cellTaken)
-                                  : (picked ? ui.cellPicked : ui.cellFree);
+  let label, styleForCell;
+
+  if (mineCell) {
+    label = "ของฉัน";
+    styleForCell = ui.cellMine;
+  } else if (status === "arrived" || status === "booked") {
+    label = "เต็ม"; // มาแล้ว หรือ จองแล้ว → เต็ม
+    styleForCell = ui.cellTaken;
+  } else if (picked) {
+    label = "เลือกแล้ว";
+    styleForCell = ui.cellPicked;
+  } else {
+    label = "ว่าง";
+    styleForCell = ui.cellFree;
+  }
 
                       const commonBtnStyle = { ...ui.cellBtn, ...styleForCell };
-                      const btnProps = mineCell
-                        ? { disabled: false, "aria-disabled": true, style: { ...commonBtnStyle, ...ui.mineNoDim } }
-                        : { disabled: takenCell, style: commonBtnStyle };
+const btnProps = mineCell
+  ? { disabled: false, "aria-disabled": true, style: { ...commonBtnStyle, ...ui.mineNoDim } }
+  : { disabled: status === "arrived" || status === "booked", style: commonBtnStyle };
 
-                      return (
-                        <button
-                          key={`${c}:${h}`}
-                          onClick={() => toggleCell(c, h)}
-                          aria-pressed={picked}
-                          aria-label={`คอร์ต ${c} เวลา ${formatHourLabel(h)}: ${label}`}
-                          {...btnProps}
-                        >
-                          <span style={ui.statusPill(takenCell, picked, mineCell)}>{label}</span>
-                        </button>
-                      );
+return (
+  <button
+    key={`${c}:${h}`}
+    onClick={() => toggleCell(c, h)}
+    aria-pressed={picked}
+    aria-label={`คอร์ต ${c} เวลา ${formatHourLabel(h)}: ${label}`}
+    {...btnProps}
+  >
+    <span style={ui.statusPill(status, picked, mineCell)}>{label}</span>
+  </button>
+);
+
                     })}
                   </div>
                 ))}
@@ -616,27 +634,34 @@ const ui = {
     filter: "none",
   },
 
-  statusPill: (isTaken, isPicked, isMine) => ({
-    fontSize: 12,
-    fontWeight: 800,
-    padding: "6px 10px",
-    borderRadius: 999,
-    border: `1px solid ${
-      isMine ? colors.success
-      : isTaken ? colors.lineStrong
-      : isPicked ? colors.primaryDark
-      : colors.lineStrong
-    }`,
-    background: isMine
-      ? "#22c55e" // เขียวชัด
-      : (isTaken
-          ? "#f1f5f9"
-          : isPicked
-            ? "#dcfce7"
-            : "#ffffff"),
-    color: isMine ? "#fff" : (isTaken ? "#94a3b8" : isPicked ? colors.success : colors.ink),
-    letterSpacing: 0.2,
-  }),
+statusPill: (status, isPicked, isMine) => ({
+  fontSize: 12,
+  fontWeight: 800,
+  padding: "6px 10px",
+  borderRadius: 999,
+  border: `1px solid ${
+    isMine ? colors.success
+    : (status === "arrived" || status === "booked") ? colors.lineStrong
+    : isPicked ? colors.primaryDark
+    : colors.lineStrong
+  }`,
+  background: isMine
+    ? "#22c55e"
+    : (status === "arrived" || status === "booked")
+      ? "#f1f5f9"
+      : isPicked
+        ? "#dcfce7"
+        : "#ffffff",
+  color: isMine
+    ? "#fff"
+    : (status === "arrived" || status === "booked")
+      ? "#94a3b8"
+      : isPicked
+        ? colors.success
+        : colors.ink,
+  letterSpacing: 0.2,
+}),
+
 
   /* Right */
   right: { minWidth: 0 },

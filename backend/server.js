@@ -353,17 +353,14 @@ const Profile = mongoose.model("Profile", profileSchema);
 
 // ✅ ดูช่วงเวลาที่ถูกจองแล้ว (เฉพาะที่ยัง active)
 // ✅ ดูช่วงเวลาที่ถูกจองแล้ว (เฉพาะวันนั้น และไม่รวม canceled)
-// GET /api/bookings/taken
 app.get("/api/bookings/taken", async (req, res) => {
   try {
     const { date } = req.query;
 
-    // ✅ validate date
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
       return res.status(400).json({ error: "ต้องส่ง date รูปแบบ YYYY-MM-DD" });
     }
 
-    // ✅ กันแคช
     res.set({
       "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
       "Pragma": "no-cache",
@@ -371,29 +368,20 @@ app.get("/api/bookings/taken", async (req, res) => {
       "Surrogate-Control": "no-store",
     });
 
-    // ✅ ใช้ whitelist ของสถานะที่ “นับว่าเต็ม”
-    const ACTIVE = ["booked", "checked_in"];
+    // ✅ whitelist ของสถานะที่นับว่าเต็ม
+    const ACTIVE = ["booked", "arrived"]; // ถ้าคุณใช้ checked_in ให้เปลี่ยนตรงนี้
 
-    // ✅ ดึงเฉพาะฟิลด์ที่ต้องใช้ + เร็วขึ้นด้วย lean()
+    // ✅ ดึงข้อมูลที่ต้องใช้
     const rows = await Booking.find(
       { date, status: { $in: ACTIVE } },
-      { court: 1, hour: 1, _id: 0 }
+      { court: 1, hour: 1, status: 1, _id: 0 }
     ).lean();
 
-    // ✅ ทำให้เป็น unique และ sort (กันข้อมูลซ้ำ)
-    const set = new Set();
-    for (const r of rows || []) {
-      const c = Number(r.court);
-      const h = Number(r.hour);
-      if (Number.isFinite(c) && Number.isFinite(h)) {
-        set.add(`${c}:${h}`);
-      }
-    }
-    const taken = Array.from(set).sort((a, b) => {
-      const [c1, h1] = a.split(":").map(Number);
-      const [c2, h2] = b.split(":").map(Number);
-      return c1 - c2 || h1 - h2;
-    });
+    // ✅ map ออกมาเป็น { key, status }
+    const taken = rows.map(r => ({
+      key: `${r.court}:${r.hour}`,
+      status: r.status
+    }));
 
     return res.json({ taken });
   } catch (err) {
@@ -401,6 +389,7 @@ app.get("/api/bookings/taken", async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 });
+
 
 
 
@@ -568,7 +557,6 @@ app.get("/api/bookings/user/:userId", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
-
 
 
 // ---------- Start Server ----------
