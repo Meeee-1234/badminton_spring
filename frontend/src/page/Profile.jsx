@@ -9,7 +9,8 @@ export default function Profile() {
   const [editForm, setEditForm] = useState({ name: "", email: "", phone: "" });
   const [message, setMessage] = useState("");
   const [userId, setUserId] = useState(null);
-    const [emergencyMessage, setEmergencyMessage] = useState("");
+  const [emergencyMessage, setEmergencyMessage] = useState("");
+  const [bookings, setBookings] = useState([]);
 
   const [emergencyForm, setEmergencyForm] = useState({
     emergencyName: "",
@@ -17,13 +18,33 @@ export default function Profile() {
   });
 
 
-  // โหลดข้อมูล user จาก localStorage
+ 
   useEffect(() => {
     const u = JSON.parse(localStorage.getItem("auth:user") || "{}");
     if (u?._id) {
       setUserId(u._id);
       setUser({ name: u.name, email: u.email, phone: u.phone });
       setEditForm({ name: u.name, email: u.email, phone: u.phone });
+
+      fetch(`${API}/api/profile/${u._id}`)
+      .then(res => {
+        if (!res.ok) throw new Error("ไม่พบข้อมูล");
+        return res.json();
+      })
+      .then(data => {
+        setEmergencyForm({
+          emergencyName: data.emergencyName || "",
+          emergencyPhone: data.emergencyPhone || ""
+        });
+      })
+      .catch(err => console.error("Emergency fetch error:", err));
+
+      fetch(`${API}/api/bookings/user/${u._id}`)
+        .then(res => res.json())
+        .then(data => {
+          setBookings(data.bookings || []);
+        })
+        .catch(err => console.error("Booking fetch error:", err));
     }
   }, []);
 
@@ -452,6 +473,66 @@ export default function Profile() {
             </form>
           </main>
         </div>
+      </section>
+
+      {/* Booking History */}
+      <section
+        style={{
+          marginTop: "32px",
+          borderRadius: "16px",
+          border: "1px solid #e5e7eb",
+          background: "white",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+          padding: "24px",
+        }}
+      >
+        <h2
+          style={{
+            fontSize: "20px",
+            fontWeight: "700",
+            color: "#1d4ed8",
+            marginBottom: "16px",
+          }}
+        >
+          ประวัติการจองสนาม
+        </h2>
+
+        {bookings.length === 0 ? (
+          <p style={{ fontSize: "14px", color: "#6b7280" }}>
+            คุณยังไม่มีประวัติการจอง
+          </p>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#f3f4f6" }}>
+                <th style={{ padding: "8px", border: "1px solid #e5e7eb" }}>วันที่</th>
+                <th style={{ padding: "8px", border: "1px solid #e5e7eb" }}>คอร์ต</th>
+                <th style={{ padding: "8px", border: "1px solid #e5e7eb" }}>เวลา</th>
+                <th style={{ padding: "8px", border: "1px solid #e5e7eb" }}>สถานะ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bookings.map((b) => (
+                <tr key={b._id}>
+                  <td style={{ padding: "8px", border: "1px solid #e5e7eb" }}>
+                    {b.date}
+                  </td>
+                  <td style={{ padding: "8px", border: "1px solid #e5e7eb" }}>
+                    คอร์ต {b.court}
+                  </td>
+                  <td style={{ padding: "8px", border: "1px solid #e5e7eb" }}>
+                    {b.hour}:00 - {b.hour + 1}:00
+                  </td>
+                  <td style={{ padding: "8px", border: "1px solid #e5e7eb" }}>
+                    {b.status === "booked" && "📌 จองแล้ว"}
+                    {b.status === "arrived" && "✅ มาแล้ว"}
+                    {b.status === "canceled" && "❌ ยกเลิก"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </section>
     </div>
   );

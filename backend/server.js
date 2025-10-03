@@ -462,30 +462,24 @@ app.patch("/api/admin/bookings/:id/status", isAdmin, async (req, res) => {
 });
 
 
+// ✅ ดึงการจองทั้งหมดของ user
+app.get("/api/bookings/user/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
 
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: "ID ไม่ถูกต้อง" });
+    }
 
+    const bookings = await Booking.find({ user: userId })
+      .sort({ date: -1, hour: 1 }); // เรียงวันที่ล่าสุดก่อน
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    res.json({ bookings });
+  } catch (err) {
+    console.error("❌ User bookings error:", err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 
 
