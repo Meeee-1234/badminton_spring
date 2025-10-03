@@ -22,6 +22,7 @@ export default function Home() {
     
     const [user, setUser] = useState(null);
     const [current, setCurrent] = useState(0); //56
+    const [selectedImage, setSelectedImage] = useState(null); // popup image
 
     useEffect(() => {
         // ดึงข้อมูล user จาก localStorage
@@ -36,9 +37,9 @@ export default function Home() {
     }, []);
 
       // Simple slider next/prev 56
-  const nextSlide = () => setCurrent((prev) => (prev + 1) % heroImages.length);
-  const prevSlide = () =>
-    setCurrent((prev) => (prev - 1 + heroImages.length) % heroImages.length);
+   const nextSlide = () => setCurrent((prev) => (prev + 1) % heroImages.length);
+  const prevSlide = () => setCurrent((prev) => (prev - 1 + heroImages.length) % heroImages.length);
+
 
   return (
     <div style={{ background: "#f3f4f6", minHeight: "100vh" }}>
@@ -176,16 +177,22 @@ export default function Home() {
 
     <main className="container" style={{ maxWidth: "1200px", margin: "40px auto", padding: "0 20px" }}><br/>
 
-        <section style={{ marginTop: "60px", background: "#ffffff", borderRadius: "16px",padding: "30px", 
-                          marginBottom: "40px", boxShadow: "0 6px 16px rgba(0,0,0,0.08)",}} >
-            <h1 style={{ textAlign: "center", margin: "30px 0", fontSize: "2rem", fontWeight: "700", color: "#064e3b" }}> 🏸 ภาพสนาม </h1><br/>
-            <div style={{ display: "flex", overflowX: "auto", gap: "20px", paddingBottom: "15px", borderBottom: "2px solid #e5e7eb",}}>
-                {images.map((img, i) => (
-                <img key={i} src={img} alt={`สนามแบด ${i + 1}`}
-                    style={{ height: "220px", borderRadius: "16px", boxShadow: "0 6px 16px rgba(0,0,0,0.15)", transition: "transform 0.3s", cursor: "pointer", }}
-                            onMouseOver={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
-                            onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1)")}/> ))}
-            </div><br/><br/>
+        {/* ---------------- ภาพสนาม ---------------- */}
+        <section style={{ marginTop: "60px", background: "#ffffff", borderRadius: "16px", padding: "30px", marginBottom: "40px", boxShadow: "0 6px 16px rgba(0,0,0,0.08)", }}>
+          <h1 style={{ textAlign: "center", margin: "30px 0", fontSize: "2rem", fontWeight: "700", color: "#064e3b" }}> 🏸 ภาพสนาม </h1><br/>
+          <div style={{ display: "flex", overflowX: "auto", gap: "20px", paddingBottom: "15px", borderBottom: "2px solid #e5e7eb", }}>
+            {images.map((img, i) => (
+              <img 
+                key={i} 
+                src={img} 
+                alt={`สนามแบด ${i + 1}`}
+                style={{ height: "220px", borderRadius: "16px", boxShadow: "0 6px 16px rgba(0,0,0,0.15)", transition: "transform 0.3s", cursor: "pointer" }}
+                onMouseOver={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
+                onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                onClick={() => setSelectedImage(img)} // <-- กดเปิด popup
+              />
+            ))}
+          </div><br/><br/>
         </section>
 
         <section style={{ marginTop: "60px", background: "#ffffff", borderRadius: "16px",padding: "30px", 
@@ -280,6 +287,43 @@ export default function Home() {
             </div><br/><br/>
         </section>
     </main>
+
+     {/* -------- Modal Popup ---------- */}
+      {selectedImage && (
+        <div 
+          onClick={() => setSelectedImage(null)} 
+          style={{
+            position: "fixed",
+            top: 0, left: 0,
+            width: "100%", height: "100%",
+            background: "rgba(0,0,0,0.8)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div style={{ position: "relative" }}>
+            <img 
+              src={selectedImage} 
+              alt="full" 
+              style={{ maxHeight: "90vh", maxWidth: "90vw", borderRadius: "12px", boxShadow: "0 8px 20px rgba(0,0,0,0.5)" }}
+            />
+            <button 
+              onClick={() => setSelectedImage(null)}
+              style={{
+                position: "absolute", top: "-40px", right: "-40px",
+                background: "white", border: "none",
+                borderRadius: "50%", width: "40px", height: "40px",
+                fontSize: "20px", cursor: "pointer", boxShadow: "0 4px 10px rgba(0,0,0,0.3)"
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
 
     <footer style={{ background: "#064e3b", color: "white", textAlign: "center", padding: "30px 20px", marginTop: "60px", fontSize: "1.2rem", fontWeight: "500",  letterSpacing: "0.5px",}} >
         © 2025 Universe Badminton. All rights reserved.

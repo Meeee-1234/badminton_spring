@@ -198,77 +198,56 @@ export default function Details() {
   };
 
   const handleConfirm = async () => {
-    setLoading(true);
-    setMsg("");
-    try {
-      const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
-      if (!user?._id) {
-        setMsg("❌ กรุณาเข้าสู่ระบบก่อนจอง");
+  setLoading(true);
+  setMsg("");
+  try {
+    const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
+    const token = localStorage.getItem("auth:token");   // ✅ ดึง token
+    
+    if (!user?._id || !token) {
+      setMsg("❌ กรุณาเข้าสู่ระบบก่อนจอง");
+      setLoading(false);
+      return;
+    }
+
+    for (const s of selected) {
+      const res = await fetch(ENDPOINTS.create, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,   // ✅ ส่ง token ให้ backend
+        },
+        body: JSON.stringify({
+          date: dateKey,
+          court: s.court,
+          hour: s.hour,
+          note,  // ถ้ามีหมายเหตุ
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setMsg(`❌ จองคอร์ต ${s.court} เวลา ${formatHourLabel(s.hour)} ไม่สำเร็จ: ${data.error || "unknown"}`);
         setLoading(false);
         return;
       }
-
-      for (const s of selected) {
-        const res = await fetch(ENDPOINTS.create, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: user._id,
-            date: dateKey,
-            court: s.court,
-            hour: s.hour,
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          setMsg(`❌ จองคอร์ต ${s.court} เวลา ${formatHourLabel(s.hour)} ไม่สำเร็จ: ${data.error || "unknown"}`);
-          setLoading(false);
-          return;
-        }
-      }
-
-      // ✅ อัพเดต state ให้กลายเป็นสีเขียวทันที
-      setMsg("✅ จองสำเร็จ!");
-      setMine((prev) => [
-        ...prev,
-        ...selected.map((s) => `${s.court}:${s.hour}`)
-      ]);
-      setTaken((prev) => [
-        ...prev,
-        ...selected.map((s) => `${s.court}:${s.hour}`)
-      ]);
-      setSelected([]);
-      setNote("");
-
-      // ✅ reload เพื่อ sync กับ server
-      try {
-        const [tRes, mRes] = await Promise.all([
-          fetch(ENDPOINTS.taken(dateKey)),
-          (async () => {
-            const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
-            if (!user?._id) return null;
-            const r = await fetch(ENDPOINTS.mine(dateKey, user._id));
-            return r.ok ? r : null;
-          })(),
-        ]);
-
-        const tJson = await tRes.json();
-        setTaken(tJson.taken || []);
-        if (mRes) {
-          const mJson = await mRes.json();
-          setMine(mJson.mine || []);
-        }
-      } catch (err) {
-        console.error("reload error:", err);
-      }
-
-    } catch (err) {
-      console.error("Booking error:", err);
-      setMsg("❌ Server error");
-    } finally {
-      setLoading(false);
     }
-  };
+
+    // ✅ อัพเดต state
+    setMsg("✅ จองสำเร็จ!");
+    setMine((prev) => [...prev, ...selected.map((s) => `${s.court}:${s.hour}`)]);
+    setTaken((prev) => [...prev, ...selected.map((s) => `${s.court}:${s.hour}`)]);
+    setSelected([]);
+    setNote("");
+
+  } catch (err) {
+    console.error("Booking error:", err);
+    setMsg("❌ Server error");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const goHome = () => {
     try { navigate("/"); } catch { window.location.href = "/"; }

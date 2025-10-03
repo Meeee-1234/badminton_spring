@@ -273,8 +273,8 @@ export default function Profile() {
                 border: "1px solid #e5e7eb",
                 background: "white",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                padding: "24px",
-                marginBottom: "24px",
+                padding: "30px",
+                marginBottom: "20px",
               }}
             >
               <h2
@@ -302,7 +302,7 @@ export default function Profile() {
                       width: "100%",
                       borderRadius: "8px",
                       border: "1px solid #d1d5db",
-                      padding: "12px",
+                      padding: "10px",
                       outline: "none",
                       fontSize: "14px",
                     }}
@@ -321,7 +321,7 @@ export default function Profile() {
                       width: "100%",
                       borderRadius: "8px",
                       border: "1px solid #d1d5db",
-                      padding: "12px",
+                      padding: "10px",
                       background: "#f9fafb",
                       color: "#6b7280",
                       fontSize: "14px",
@@ -342,7 +342,7 @@ export default function Profile() {
                       width: "100%",
                       borderRadius: "8px",
                       border: "1px solid #d1d5db",
-                      padding: "12px",
+                      padding: "10px",
                       outline: "none",
                       fontSize: "14px",
                     }}
@@ -387,7 +387,7 @@ export default function Profile() {
                 border: "1px solid #e5e7eb",
                 background: "white",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                padding: "24px",
+                padding: "30px",
               }}
             >
               <h2
@@ -415,7 +415,7 @@ export default function Profile() {
                       width: "100%",
                       borderRadius: "8px",
                       border: "1px solid #d1d5db",
-                      padding: "12px",
+                      padding: "10px",
                       outline: "none",
                       fontSize: "14px",
                     }}
@@ -435,7 +435,7 @@ export default function Profile() {
                       width: "100%",
                       borderRadius: "8px",
                       border: "1px solid #d1d5db",
-                      padding: "12px",
+                      padding: "10px",
                       outline: "none",
                       fontSize: "14px",
                     }}
@@ -476,64 +476,101 @@ export default function Profile() {
       </section>
 
       {/* Booking History */}
-      <section
+<section
+  style={{
+    marginTop: "32px",
+    borderRadius: "16px",
+    border: "1px solid #e5e7eb",
+    background: "white",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+    padding: "24px",
+  }}
+>
+  <h2
+    style={{
+      fontSize: "20px",
+      fontWeight: "700",
+      color: "#065f46", // เขียวเข้ม
+      marginBottom: "16px",
+    }}
+  >
+    ประวัติการจองสนาม
+  </h2>
+
+  {bookings.length === 0 ? (
+    <p style={{ fontSize: "14px", color: "#6b7280" }}>
+      คุณยังไม่มีประวัติการจอง
+    </p>
+  ) : (
+    <div style={{ overflowX: "auto" }}>
+      <table
         style={{
-          marginTop: "32px",
-          borderRadius: "16px",
-          border: "1px solid #e5e7eb",
-          background: "white",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-          padding: "24px",
+          width: "100%",
+          borderCollapse: "collapse",
+          borderRadius: "12px",
+          overflow: "hidden",
         }}
       >
-        <h2
-          style={{
-            fontSize: "20px",
-            fontWeight: "700",
-            color: "#1d4ed8",
-            marginBottom: "16px",
-          }}
-        >
-          ประวัติการจองสนาม
-        </h2>
+        <thead>
+          <tr style={{ background: "#065f46" }}> {/* เขียวสด */}
+            <th style={{ padding: "12px", color: "white", fontWeight: "600", textAlign: "center" }}>วันที่</th>
+            <th style={{ padding: "12px", color: "white", fontWeight: "600", textAlign: "center" }}>คอร์ต</th>
+            <th style={{ padding: "12px", color: "white", fontWeight: "600", textAlign: "center" }}>เวลา</th>
+            <th style={{ padding: "12px", color: "white", fontWeight: "600", textAlign: "center" }}>สถานะ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {bookings.map((b, index) => (
+            <tr
+              key={b._id}
+              style={{
+                background: index % 2 === 0 ? "#ffffff" : "#f9fafb", // แถวสลับสี
+                transition: "background 0.2s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "#ecfdf5")} // hover เป็นเขียวอ่อน
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background =
+                  index % 2 === 0 ? "#ffffff" : "#f9fafb")
+              }
+            >
+              <td style={{ padding: "10px", border: "1px solid #e5e7eb", textAlign: "center", color: "#111827" }}>
+                {b.date}
+              </td>
+              <td style={{ padding: "10px", border: "1px solid #e5e7eb", textAlign: "center", color: "#111827" }}>
+                คอร์ต {b.court}
+              </td>
+              <td style={{ padding: "10px", border: "1px solid #e5e7eb", textAlign: "center", color: "#111827" }}>
+                {b.hour}:00 - {b.hour + 1}:00
+              </td>
+              <td style={{ padding: "10px", border: "1px solid #e5e7eb", textAlign: "center" }}>
+                <span
+                  style={{
+                    display: "inline-block",
+                    padding: "4px 10px",
+                    borderRadius: "12px",
+                    fontWeight: "600",
+                    color: "#064e3b",
+                    background:
+                      b.status === "booked"
+                        ? "#d1fae5" // เขียวอ่อน
+                        : b.status === "arrived"
+                        ? "#bbf7d0" // เขียวเข้มกว่า
+                        : "#fee2e2", // แดงอ่อน (ยกเลิก)
+                  }}
+                >
+                  {b.status === "booked" && " จองแล้ว"}
+                  {b.status === "arrived" && " มาแล้ว"}
+                  {b.status === "canceled" && " ยกเลิก"}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</section>
 
-        {bookings.length === 0 ? (
-          <p style={{ fontSize: "14px", color: "#6b7280" }}>
-            คุณยังไม่มีประวัติการจอง
-          </p>
-        ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: "#f3f4f6" }}>
-                <th style={{ padding: "8px", border: "1px solid #e5e7eb" }}>วันที่</th>
-                <th style={{ padding: "8px", border: "1px solid #e5e7eb" }}>คอร์ต</th>
-                <th style={{ padding: "8px", border: "1px solid #e5e7eb" }}>เวลา</th>
-                <th style={{ padding: "8px", border: "1px solid #e5e7eb" }}>สถานะ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bookings.map((b) => (
-                <tr key={b._id}>
-                  <td style={{ padding: "8px", border: "1px solid #e5e7eb" }}>
-                    {b.date}
-                  </td>
-                  <td style={{ padding: "8px", border: "1px solid #e5e7eb" }}>
-                    คอร์ต {b.court}
-                  </td>
-                  <td style={{ padding: "8px", border: "1px solid #e5e7eb" }}>
-                    {b.hour}:00 - {b.hour + 1}:00
-                  </td>
-                  <td style={{ padding: "8px", border: "1px solid #e5e7eb" }}>
-                    {b.status === "booked" && "📌 จองแล้ว"}
-                    {b.status === "arrived" && "✅ มาแล้ว"}
-                    {b.status === "canceled" && "❌ ยกเลิก"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
     </div>
   );
 }

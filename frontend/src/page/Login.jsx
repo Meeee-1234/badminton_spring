@@ -64,7 +64,7 @@ export default function Login() {
         <form onSubmit={handleSubmit} style={{ marginTop: 20 }}>
           {/* Email */}
           <div style={ui.field}>
-            <label htmlFor="email" style={ui.label}>อีเมล</label>
+            <label htmlFor="email" style={ui.label}>Email</label>
             <div style={ui.inputWrap}>
               <input
                 id="email"
@@ -82,7 +82,7 @@ export default function Login() {
 
           {/* Password */}
           <div style={ui.field}>
-            <label htmlFor="password" style={ui.label}>รหัสผ่าน</label>
+            <label htmlFor="password" style={ui.label}>Password</label>
             <div style={ui.inputWrap}>
               <input
                 id="password"
