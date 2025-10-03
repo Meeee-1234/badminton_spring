@@ -403,10 +403,17 @@ app.post("/api/bookings", authRequired, async (req, res) => {
       return res.status(400).json({ error: "ต้องส่ง date, court, hour" });
     }
 
-    const exists = await Booking.findOne({ date, court, hour });
-    if (exists) {
-      return res.status(409).json({ error: "ช่วงเวลานี้ถูกจองแล้ว" });
-    }
+    // ✅ แก้เป็นแบบนี้
+const exists = await Booking.findOne({ 
+  date, 
+  court, 
+  hour, 
+  status: { $in: ["booked", "arrived"] }   // นับแค่ที่ยัง active
+});
+if (exists) {
+  return res.status(409).json({ error: "ช่วงเวลานี้ถูกจองแล้ว" });
+}
+
 
     const booking = await Booking.create({
       user: userId,
