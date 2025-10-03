@@ -117,7 +117,7 @@ export default function Home() {
           </h1>
           {user ? (
   <Link
-    to={user.role === "admin" ? "/admin-details" : "/details"}
+    to={user.role === "admin" ? "/admindetails" : "/details"}
     style={{
       padding: "12px 30px",
       background: "#10b981",

@@ -461,7 +461,6 @@ app.get("/api/profile/:userId", async (req, res) => {
 
 
 // ✅ Update booking status (Admin only)
-// ✅ Update booking status (Admin only)
 app.put("/api/admin/bookings/:id/status", isAdmin, async (req, res) => {
   try {
     const { id } = req.params;

@@ -190,7 +190,7 @@ export default function Profile() {
             <div
               style={{
                 borderRadius: "16px",
-                border: "2px solid #065f46",
+                border: "1px solid #6ee7b7",
                 background: "white",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                 padding: "24px",
@@ -272,7 +272,7 @@ export default function Profile() {
               onSubmit={handleSave}
               style={{
                 borderRadius: "16px",
-                border: "2px solid #065f46",
+                border: "1px solid #6ee7b7",
                 background: "white",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                 padding: "30px",
@@ -303,7 +303,7 @@ export default function Profile() {
                     style={{
                       width: "100%",
                       borderRadius: "8px",
-                      border: "1px solid #d1d5db",
+                      border: "1px solid #6ee7b7",
                       padding: "10px",
                       outline: "none",
                       fontSize: "14px",
@@ -343,7 +343,7 @@ export default function Profile() {
                     style={{
                       width: "100%",
                       borderRadius: "8px",
-                      border: "1px solid #d1d5db",
+                      border: "1px solid #6ee7b7",
                       padding: "10px",
                       outline: "none",
                       fontSize: "14px",
@@ -386,7 +386,7 @@ export default function Profile() {
               onSubmit={handleSaveEmergency}
               style={{
                 borderRadius: "16px",
-                border: "2px solid #065f46",
+                border: "1px solid #6ee7b7",
                 background: "white",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                 padding: "30px",
@@ -416,7 +416,7 @@ export default function Profile() {
                     style={{
                       width: "100%",
                       borderRadius: "8px",
-                      border: "1px solid #d1d5db",
+                      border: "1px solid #6ee7b7",
                       padding: "10px",
                       outline: "none",
                       fontSize: "14px",
@@ -436,7 +436,7 @@ export default function Profile() {
                     style={{
                       width: "100%",
                       borderRadius: "8px",
-                      border: "1px solid #d1d5db",
+                      border: "1px solid #6ee7b7",
                       padding: "10px",
                       outline: "none",
                       fontSize: "14px",
@@ -482,7 +482,7 @@ export default function Profile() {
   style={{
     marginTop: "32px",
     borderRadius: "16px",
-    border: "1px solid #e5e7eb",
+    border: "1px solid #6ee7b7",
     background: "white",
     boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
     padding: "24px",

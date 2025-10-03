@@ -133,25 +133,34 @@ export default function AdminDetails() {
   };
 
   const setStatus = async (id, next) => {
-    try {
-      const token = localStorage.getItem("auth:token");
-      const res = await fetch(ENDPOINTS.setStatus(id), {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ status: next }),
-      });
-      const text = await res.text();
-      let data = null; try { data = JSON.parse(text); } catch {}
-      if (!res.ok) throw new Error(data?.error || text || "อัปเดตไม่สำเร็จ");
+  try {
+    const token = localStorage.getItem("auth:token");
+    const res = await fetch(ENDPOINTS.setStatus(id), {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ status: next }),
+    });
+    const text = await res.text();
+    let data = null; try { data = JSON.parse(text); } catch {}
+    if (!res.ok) throw new Error(data?.error || text || "อัปเดตไม่สำเร็จ");
+
+    // ✅ ถ้าเป็นยกเลิก → ลบออกจาก state เลย
+    if (next === "cancelled") {
+      setBookings((prev) => prev.filter((b) => b._id !== id));
+    } else {
+      // ถ้าเป็นมาแล้ว → อัปเดตสถานะ
       setBookings((prev) => prev.map((b) => (b._id === id ? { ...b, status: next } : b)));
-      setMsg("✅ อัปเดตสำเร็จ");
-    } catch (e) {
-      setMsg(`❌ อัปเดตไม่สำเร็จ: ${e.message || String(e)}`);
     }
-  };
+
+    setMsg("✅ อัปเดตสำเร็จ");
+  } catch (e) {
+    setMsg(`❌ อัปเดตไม่สำเร็จ: ${e.message || String(e)}`);
+  }
+};
+
 
   return (
     <div style={sx.page}>

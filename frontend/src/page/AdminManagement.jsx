@@ -8,6 +8,7 @@ export default function AdminManagement() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [searchTerm, setSearchTerm] = useState(""); 
   const navigate = useNavigate();
 
   // ✅ Logout
@@ -93,31 +94,16 @@ export default function AdminManagement() {
 
   if (loading) return <p>⏳ กำลังโหลด...</p>;
 
-  // ✅ ฟังก์ชันอัปเดตสถานะ booking
-  const updateStatus = async (id, nextStatus) => {
-    const token = localStorage.getItem("auth:token");
-    try {
-      const res = await fetch(`${API}/api/admin/bookings/${id}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: nextStatus }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "อัปเดตไม่สำเร็จ");
-
-      setBookings((prev) =>
-        prev.map((b) => (b._id === id ? { ...b, status: nextStatus } : b))
-      );
-      alert("✅ อัปเดตสำเร็จ");
-    } catch (err) {
-      console.error("❌ Update error:", err);
-      alert("❌ " + err.message);
-    }
-  };
+   // ✅ ฟิลเตอร์ booking ก่อนแสดงผล
+  const filteredBookings = bookings.filter((b) => {
+    const keyword = searchTerm.toLowerCase();
+    return (
+      (b.user?.name || "").toLowerCase().includes(keyword) ||
+      (b.date || "").toLowerCase().includes(keyword) ||
+      (b.court || "").toString().includes(keyword) ||
+      (b.status || "").toLowerCase().includes(keyword)
+    );
+  });
 
   return (
     <div style={{ padding: 20, fontFamily: "Segoe UI, sans-serif", background: "#f9fafb", minHeight: "100vh" }}>
@@ -188,6 +174,23 @@ export default function AdminManagement() {
       {/* Bookings Table */}
       <section style={{ marginBottom: 40 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>📝 Bookings</h2>
+
+        {/* ✅ Search Box */}
+        <input
+          type="text"
+          placeholder="🔍 ค้นหา Booking (ชื่อ, วันที่, คอร์ท, สถานะ)"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{
+            marginBottom: 12,
+            padding: "8px 12px",
+            width: "100%",
+            maxWidth: 350,
+            border: "1px solid #d1d5db",
+            borderRadius: 8,
+          }}
+        />
+
         <div style={{ overflowX: "auto", background: "#fff", borderRadius: 10, boxShadow: "0 4px 10px rgba(0,0,0,0.05)" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
@@ -200,8 +203,8 @@ export default function AdminManagement() {
               </tr>
             </thead>
             <tbody>
-              {bookings.length > 0 ? (
-                bookings.map((b, index) => (
+                {filteredBookings.length > 0 ? (
+                filteredBookings.map((b, index) => (
                   <tr key={b._id}>
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>{index + 1}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>{b.user?.name || "-"}</td>
@@ -215,24 +218,6 @@ export default function AdminManagement() {
                         {b.status === "canceled" && "ยกเลิก"}
                         {!b.status && "-"}
                       </span>
-
-                      {/* ปุ่มเปลี่ยนสถานะ */}
-                      <div style={{ marginTop: 6, display: "flex", gap: 6, justifyContent: "center" }}>
-                        <button
-                          onClick={() => updateStatus(b._id, "arrived")}
-                          disabled={b.status === "arrived"}
-                          style={{ background: "#dcfce7", border: "1px solid #16a34a", padding: "4px 8px", borderRadius: 6, cursor: "pointer" }}
-                        >
-                          ✓ มาแล้ว
-                        </button>
-                        <button
-                          onClick={() => updateStatus(b._id, "canceled")}
-                          disabled={b.status === "canceled"}
-                          style={{ background: "#fee2e2", border: "1px solid #ef4444", padding: "4px 8px", borderRadius: 6, cursor: "pointer" }}
-                        >
-                          × ยกเลิก
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 ))
