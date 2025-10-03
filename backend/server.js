@@ -1,516 +1,712 @@
-// server.js (CommonJS)
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken"); // Admin....
-require("dotenv").config();
-
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// ---------- CORS ----------
-app.use(
-  
-  cors({
-    origin: [
-      "http://localhost:3000",
-      "https://badminton-mongo.vercel.app",
-      "https://badminton-hzwm.vercel.app"
-        ],
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-    credentials: true,
-  })
-);
-
-app.use(express.json());
-
-// ---------- Connect MongoDB ----------
-mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log("✅ Connected to MongoDB");
-    console.log("📌 Using DB:", mongoose.connection.db.databaseName);
-  })
-  .catch((err) => console.error("❌ MongoDB error:", err.message));
-
-
-// ---------- User Schema ----------
-const userSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    phone: { type: String, required: true },
-    password: { type: String, required: true }, // hash password
-    role: { type: String, enum: ["user", "admin"], default: "user" },
-    isDeleted: { type: Boolean, default: false }
-  },
-  { timestamps: true, collection: "users" }
-);
-
-const User = mongoose.model("User", userSchema);
-
-
-// ---------- Booking Schema ----------
-const bookingSchema = new mongoose.Schema(
-  {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    date: { type: String, required: true }, // YYYY-MM-DD
-    court: { type: Number, required: true }, // คอร์ต 1-6
-    hour: { type: Number, required: true },  // ชั่วโมง เช่น 9 = 9:00-10:00
-    status: { 
-      type: String, 
-      enum: ["booked", "arrived", "canceled"], 
-      default: "booked"   // เวลาจองใหม่ → สถานะ = จองแล้ว
-    },
-  },
-  { timestamps: true, collection: "bookings" }
-);
-
-const Booking = mongoose.model("Booking", bookingSchema);
-
-
-// ---------- Admin Seed ----------
-async function createAdmin() {
-  const adminEmail = "admin@gmail.com";
-  const exists = await User.findOne({ email: adminEmail });
-  if (!exists) {
-    const hash = await bcrypt.hash("Admin1234!", 10); // ✅ hash password ก่อน
-    await User.create({
-      name: "Admin",
-      email: adminEmail,      // ✅ ใช้ตัวแปรที่เป็น string ข้างบน
-      phone: "0812345678",
-      password: hash,         // ✅ เก็บ hash ไม่ใช่ plain text
-      role: "admin",
-    });
-    console.log("✅ Admin user created");
-  }
-}
-createAdmin();
-
-// ---------- Middleware ----------
-function isAdmin(req, res, next) {
-  try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ error: "Unauthorized" });
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "supersecret");
-
-    if (decoded.role !== "admin") {
-      return res.status(403).json({ error: "Forbidden: Admin only" });
-    }
-    next();
-  } catch (err) {
-    res.status(401).json({ error: "Invalid token" });
-  }
-}
-
-
-// ✅ ตรวจสอบ user ที่ login + ไม่ถูกลบ
-function authRequired(req, res, next) {
-  try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ error: "Unauthorized" });
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "supersecret");
-
-    User.findById(decoded.id).then(user => {
-      if (!user || user.isDeleted) {
-        return res.status(403).json({ error: "บัญชีนี้ถูกปิดการใช้งาน" });
-      }
-      req.user = user; // เก็บ user ไว้ใช้ใน route
-      next();
-    });
-  } catch (err) {
-    res.status(401).json({ error: "Invalid token" });
-  }
-}
-
-// ---------- Admin Routes ----------
-app.get("/api/admin/users", isAdmin, async (req, res) => {
-  try {
-    const users = await User.find({ isDeleted: { $ne: true } }).select("-password");
-
-    const formatted = users.map((u) => ({
-      ...u.toObject(),
-      createdAt: new Date(u.createdAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }),
-      updatedAt: new Date(u.updatedAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }),
-    }));
-
-    res.json({ users });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch users" });
-  }
-});
-
-
-app.get("/api/admin/bookings", isAdmin, async (req, res) => {
-  try {
-    const bookings = await Booking.find().populate("user", "name email");
-    const formatted = bookings.map((b) => ({
-      _id: b._id,
-      user: b.user ? { name: b.user.name, email: b.user.email } : null,
-      date: b.date,
-      court: b.court,
-      hour: b.hour,
-      // status: "booked"
-      status: b.status,
-      createdAt: new Date(b.createdAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }),
-      updatedAt: new Date(b.updatedAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })
-    }));
-    res.json({ bookings: formatted });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch bookings" });
-  }
-});
-
-// ✏️ Soft Delete User (Admin only)
-app.delete("/api/admin/users/:id", isAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // เช็คว่า id ถูกต้องมั้ย
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ error: "ID ไม่ถูกต้อง (ต้องเป็น ObjectId)" });
-    }
-
-    // อัปเดตค่า isDeleted = true
-    const user = await User.findByIdAndUpdate(
-      id,
-      { isDeleted: true },
-      { new: true }
-    );
-
-    if (!user) {
-      return res.status(404).json({ error: "ไม่พบผู้ใช้" });
-    }
-
-    res.json({
-      message: "ปิดการใช้งานบัญชีเรียบร้อยแล้ว (Soft Delete)",
-      user
-    });
-  } catch (err) {
-    console.error("❌ Soft delete error:", err.message);
-    res.status(500).json({ error: "Server error", detail: err.message });
-  }
-});
-
-
-
-// ---------- Routes ----------
-app.get("/", (req, res) => {
-  res.json({ message: "Welcome to the Badminton API!" });
-});
-
-// ➕ Register
-app.post("/api/auth/register", async (req, res) => {
-  try {
-    const { name, email, phone, password } = req.body;
-
-    if (!name || !email || !phone || !password) {
-      return res
-        .status(400)
-        .json({ error: "กรอกข้อมูลให้ครบ name, email, phone, password" });
-    }
-
-    const exists = await User.findOne({ email });
-    if (exists) {
-      return res.status(409).json({ error: "อีเมลนี้มีผู้ใช้แล้ว" });
-    }
-
-    const hash = await bcrypt.hash(password, 10);
-    const user = await User.create({ name, email, phone, password: hash });
-
-    const { password: _, ...safeUser } = user.toObject();
-    return res.status(201).json({ message: "สมัครสมาชิกสำเร็จ", user: safeUser });
-  } catch (err) {
-    console.error("❌ Register error:", err.message);
-    return res.status(500).json({ error: "Server error", detail: err.message });
-  }
-});
-
-
-// 📄 Get users
-app.get("/api/users", async (req, res) => {
-  try {
-    const users = await User.find({}, { password: 0 }).lean();
-    res.json(users);
-  } catch (err) {
-    console.error("❌ Get users error:", err.message);
-    res.status(500).json({ error: "Server error while fetching users" });
-  }
-});
-
-
-// 📄 Login
-app.post("/api/auth/login", async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: "กรอกอีเมลและรหัสผ่าน" });
-    }
-
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(401).json({ error: "ไม่พบบัญชีนี้" });
-    }
-
-    // ✅ ถ้าโดน Soft Delete → ห้ามเข้า
-    if (user.isDeleted) {
-      return res.status(403).json({ error: "บัญชีนี้ถูกปิดการใช้งาน" });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ error: "รหัสผ่านไม่ถูกต้อง" });
-    }
-
-    const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role },
-      process.env.JWT_SECRET || "supersecret",
-      { expiresIn: "1d" }
-    );
-
-    const { password: _, ...safeUser } = user.toObject();
-    res.json({ message: "เข้าสู่ระบบสำเร็จ", token, user: safeUser });
-  } catch (err) {
-    console.error("❌ Login error:", err.message);
-    res.status(500).json({ error: "Server error", detail: err.message });
-  }
-});
-
-
-// 📄 Get user by id
-app.get("/api/users/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // ✅ เช็คว่า id เป็น ObjectId ถูกต้องมั้ย
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ error: "ID ไม่ถูกต้อง (ต้องเป็น ObjectId)" });
-    }
-
-    const user = await User.findById(id, { password: 0 }).lean();
-
-    if (!user) {
-      return res.status(404).json({ error: "ไม่พบผู้ใช้" });
-    }
-
-    res.json(user);
-  } catch (err) {
-    console.error("❌ Get user by id error:", err.message);
-    res.status(500).json({ error: "Server error", detail: err.message });
-  }
-});
-
-// ✏️ Update user by id
-app.put("/api/users/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, phone } = req.body;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ error: "ID ไม่ถูกต้อง (ต้องเป็น ObjectId)" });
-    }
-
-    const user = await User.findByIdAndUpdate(
-      id,
-      { name, phone },
-      { new: true, runValidators: true, projection: { password: 0 } }
-    );
-
-    if (!user) {
-      return res.status(404).json({ error: "ไม่พบผู้ใช้" });
-    }
-
-    res.json({ message: "อัพเดตข้อมูลเรียบร้อยแล้ว", user });
-  } catch (err) {
-    console.error("❌ Update user error:", err.message);
-    res.status(500).json({ error: "Server error", detail: err.message });
-  }
-});
-
-
-// ---------- Profile Schema ----------
-const profileSchema = new mongoose.Schema(
-  {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
-    emergencyName: { type: String, default: "" },   // ชื่อผู้ติดต่อฉุกเฉิน
-    emergencyPhone: { type: String, default: "" },  // เบอร์โทรฉุกเฉิน
-  },
-  { timestamps: true, collection: "profiles" }
-);
-
-const Profile = mongoose.model("Profile", profileSchema);
-
-
-
-
-// ---------- Booking Routes ----------
-
-// ✅ ดูช่วงเวลาที่ถูกจองแล้ว
-app.get("/api/bookings/taken", async (req, res) => {
-  try {
-    const { date } = req.query;
-    if (!date) return res.status(400).json({ error: "ต้องส่ง date" });
-
-    const bookings = await Booking.find({ date });
-    const taken = bookings.map((b) => `${b.court}:${b.hour}`);
-    res.json({ taken });
-  } catch (err) {
-    console.error("❌ Get taken error:", err.message);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// ✅ จองสนามใหม่ (ต้อง login)
-app.post("/api/bookings", authRequired, async (req, res) => {
-  try {
-    const { date, court, hour, note } = req.body;
-    const userId = req.user._id; // เอาจาก token โดยตรง ไม่ต้องให้ client ส่ง
-
-    if (!date || court == null || hour == null) {
-      return res.status(400).json({ error: "ต้องส่ง date, court, hour" });
-    }
-
-    const exists = await Booking.findOne({ date, court, hour });
-    if (exists) {
-      return res.status(409).json({ error: "ช่วงเวลานี้ถูกจองแล้ว" });
-    }
-
-    const booking = await Booking.create({
-      user: userId,
-      date,
-      court,
-      hour,
-      note,
-      status: "booked"
-    });
-
-    res.status(201).json({ message: "จองสำเร็จ", booking });
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// ✅ ดูการจองของ user ตามวัน
-app.get("/api/bookings/my/:userId/:date", async (req, res) => {
-  try {
-    const { userId, date } = req.params;
-
-    if (!date) {
-      return res.status(400).json({ error: "ต้องส่ง date" });
-    }
-
-    const myBookings = await Booking.find({ user: userId, date })
-      .sort({ hour: 1 });
-
-    const mine = myBookings.map(b => `${b.court}:${b.hour}`);
-    res.json({ mine });
-  } catch (err) {
-    console.error("❌ My bookings error:", err.message);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-
-
-// POST หรือ PUT profile
-app.post("/api/profile/:userId", async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const { emergencyName, emergencyPhone } = req.body;
-
-    const profile = await Profile.findOneAndUpdate(
-      { user: userId },
-      { emergencyName, emergencyPhone },
-      { new: true, upsert: true } // upsert = ถ้ายังไม่มี profile ให้สร้างใหม่
-    );
-
-    res.json({ message: "อัพเดตโปรไฟล์เรียบร้อย", profile });
-  } catch (err) {
-    console.error("❌ Profile update error:", err.message);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-app.get("/api/profile/:userId", async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const profile = await Profile.findOne({ user: userId });
-
-    if (!profile) {
-      return res.status(404).json({ error: "ไม่พบโปรไฟล์" });
-    }
-
-    const formatted = {
-      ...profile.toObject(),
-      createdAt: new Date(profile.createdAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }),
-      updatedAt: new Date(profile.updatedAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }),
+// src/Details.jsx
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+
+const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
+
+/** ===== CONFIG ===== */
+const OPEN_HOUR = 9;
+const CLOSE_HOUR = 21; // ช่องสุดท้าย 20:00–21:00
+const HOURS = Array.from({ length: CLOSE_HOUR - OPEN_HOUR }, (_, i) => OPEN_HOUR + i);
+const COURTS = [1, 2, 3, 4, 5, 6];
+const PRICE_PER_HOUR = 120;
+
+/** THEME (โทนเขียวอ่อน) */
+const colors = {
+  primary: "#34d399",
+  primaryDark: "#10b981",
+  primarySoft: "#ecfdf5",
+  accent: "#22c55e",
+  ink: "#0f172a",
+  muted: "#64748b",
+  line: "#e5e7eb",
+  lineStrong: "#d1d5db",
+  card: "#ffffff",
+  bg: "#f6fef8",
+  danger: "#ef4444",
+  success: "#16a34a",
+  taken: "#eef2f4",
+};
+
+/** เปลี่ยนเส้นทาง API ให้ตรงกับระบบคุณ */
+const ENDPOINTS = {
+  taken: (date) => `${API}/api/bookings/taken?date=${encodeURIComponent(date)}`,
+  mine: (date, userId) => `${API}/api/bookings/my/${encodeURIComponent(userId)}/${encodeURIComponent(date)}`,
+  create: `${API}/api/bookings`,
+};
+
+/** ใช้วันที่แบบ Local (แก้ปัญหา UTC คลาดวัน) */
+const toDateKey = (d = new Date()) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+/** ระยะเวลาถึงเที่ยงคืนครั้งถัดไป (Local) */
+const msUntilNextMidnightLocal = () => {
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+  return next.getTime() - now.getTime();
+};
+
+export default function Details() {
+  const navigate = useNavigate();
+
+  // 🔒 วัน “วันนี้” อัตโนมัติ + เด้งเปลี่ยนเองตอนเที่ยงคืน
+  const [dateKey, setDateKey] = useState(() => toDateKey());
+  const [taken, setTaken] = useState([]);       // ["1:9","2:10"]
+  const [mine, setMine]   = useState([]);       // ["1:9","2:10"] ของผู้ใช้
+  const [selected, setSelected] = useState([]); // [{court, hour}]
+  const [note, setNote] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  // ✅ สเกลอัตโนมัติให้ “พอดีจอ”
+  const [scale, setScale] = useState(1);
+  const viewportRef = useRef(null);
+  const contentRef = useRef(null);
+
+  // เก็บ user ไว้ reuse
+  const userRef = useRef(null);
+  useEffect(() => {
+    userRef.current = JSON.parse(localStorage.getItem("auth:user") || "{}");
+  }, []);
+
+  // คำนวณ scale เมื่อโหลด/เปลี่ยนขนาดหน้าต่าง/เนื้อหา
+  useLayoutEffect(() => {
+    const calc = () => {
+      const ct = contentRef.current;
+      if (!ct) return;
+      ct.style.transform = "scale(1)";
+      ct.style.width = "auto";
+
+      const pad = 8;
+      const availW = Math.max(320, window.innerWidth - pad * 2);
+      const availH = Math.max(320, window.innerHeight - pad * 2);
+
+      const rect = ct.getBoundingClientRect();
+      const neededW = rect.width;
+      const neededH = rect.height;
+
+      let s = Math.min(availW / neededW, availH / neededH, 1);
+      s = Math.max(0.1, Math.min(1, Number(s.toFixed(3))));
+
+      ct.style.transform = `scale(${s})`;
+      ct.style.transformOrigin = "top left";
+      ct.style.width = s < 1 ? `${100 / s}%` : "auto";
+      setScale(s);
+
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.overflow = "hidden";
     };
 
-    res.json(profile);
-  } catch (err) {
-    console.error("❌ Profile get error:", err.message);
-    res.status(500).json({ error: "Server error" });
-  }
-});
+    calc();
+    const onResize = () => calc();
 
+    const ro = new ResizeObserver(calc);
+    if (contentRef.current) ro.observe(contentRef.current);
 
-// ✅ Update booking status (Admin only)
-app.put("/api/admin/bookings/:id/status", isAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      ro.disconnect();
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+    };
+  }, []);
 
-    if (!["booked", "arrived", "canceled"].includes(status)) {
-      return res.status(400).json({ error: "สถานะไม่ถูกต้อง" });
+  // อัปเดตเป็นวันใหม่อัตโนมัติ "เที่ยงคืน (Local)" + กันเคส Sleep/ปลุกแท็บ
+  useEffect(() => {
+    let midnightTimer;
+
+    const scheduleNext = () => {
+      clearTimeout(midnightTimer);
+      midnightTimer = setTimeout(() => {
+        const today = toDateKey(new Date());
+        setDateKey(prev => (prev !== today ? today : prev));
+        scheduleNext(); // นัดหมายเที่ยงคืนถัดไป
+      }, msUntilNextMidnightLocal());
+    };
+
+    // sync ทันทีรอบแรก (กันเคสเปิดทิ้งไว้ข้ามวัน)
+    const todayNow = toDateKey(new Date());
+    setDateKey(prev => (prev !== todayNow ? todayNow : prev));
+    scheduleNext();
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        const t = toDateKey(new Date());
+        setDateKey(prev => (prev !== t ? t : prev));
+        scheduleNext(); // รีเซ็ตนัดหมายให้ตรงเที่ยงคืนถัดไป
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      clearTimeout(midnightTimer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+
+  // เคลียร์สถานะเลือก/ข้อความเมื่อวันเปลี่ยน
+  useEffect(() => {
+    setSelected([]);
+    setMsg("");
+  }, [dateKey]);
+
+  /** ========= โหลดสถานะจอง (taken + mine) =========
+   *  ใช้ซ้ำได้ทั้งจากปุ่ม "รีเฟรช" / โฟกัสหน้าต่าง / interval
+   */
+  const loadTakenMine = useCallback(async () => {
+    try {
+      const user = userRef.current || JSON.parse(localStorage.getItem("auth:user") || "{}");
+
+      const [tRes, mRes] = await Promise.all([
+        fetch(ENDPOINTS.taken(dateKey), { cache: "no-store" }),
+        user?._id
+          ? fetch(ENDPOINTS.mine(dateKey, user._id), { cache: "no-store" }).catch(() => null)
+          : Promise.resolve(null),
+      ]);
+
+      // taken
+      if (tRes?.ok) {
+        const tJson = await tRes.json();
+        setTaken(Array.isArray(tJson?.taken) ? tJson.taken : []);
+      } else {
+        setTaken([]);
+      }
+
+      // mine
+      if (mRes && mRes.ok) {
+        const mJson = await mRes.json();
+        setMine(Array.isArray(mJson?.mine) ? mJson.mine : []);
+      } else {
+        setMine([]);
+      }
+    } catch (err) {
+      console.error("Load bookings error:", err);
+      // ไม่ขึ้น error บ่อยเกินไป รบกวนผู้ใช้
     }
+  }, [dateKey]);
 
-    const booking = await Booking.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true }
-    ).populate("user", "name email");
+  // โหลดครั้งแรก + ตั้ง interval (polling) + โหลดเมื่อหน้าต่างโฟกัส
+  useEffect(() => {
+    let cancelled = false;
+    loadTakenMine();
+    const onFocus = () => loadTakenMine();
+    window.addEventListener("focus", onFocus);
 
-    if (!booking) {
-      return res.status(404).json({ error: "ไม่พบการจอง" });
+    // ปรับช่วงเวลาได้ตามต้องการ (เช่น 7–15 วินาที)
+    const intervalId = setInterval(() => {
+      if (!cancelled) loadTakenMine();
+    }, 10000);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      clearInterval(intervalId);
+    };
+  }, [loadTakenMine]);
+
+  const formatHourLabel = (h) => `${h.toString().padStart(2, "0")}:00 - ${h + 1}:00`;
+  const isTaken = (c, h) => taken.includes(`${c}:${h}`);
+  const isMine  = (c, h) => mine.includes(`${c}:${h}`);
+  const isSelected = (c, h) => selected.some((s) => s.court === c && s.hour === h);
+
+  const toggleCell = (c, h) => {
+    if (isTaken(c, h)) return; // ช่องจองแล้วคลิกไม่ได้
+    setSelected((prev) =>
+      prev.some((s) => s.court === c && s.hour === h)
+        ? prev.filter((s) => !(s.court === c && s.hour === h))
+        : [...prev, { court: c, hour: h }]
+    );
+  };
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    setMsg("");
+    try {
+      const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
+      const token = localStorage.getItem("auth:token");   // ✅ ดึง token
+      
+      if (!user?._id || !token) {
+        setMsg("❌ กรุณาเข้าสู่ระบบก่อนจอง");
+        setLoading(false);
+        return;
+      }
+
+      for (const s of selected) {
+        const res = await fetch(ENDPOINTS.create, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,   // ✅ ส่ง token ให้ backend
+          },
+          body: JSON.stringify({
+            date: dateKey,
+            court: s.court,
+            hour: s.hour,
+            note,  // ถ้ามีหมายเหตุ
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          setMsg(`❌ จองคอร์ต ${s.court} เวลา ${formatHourLabel(s.hour)} ไม่สำเร็จ: ${data.error || "unknown"}`);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // ✅ อัพเดต state แบบ optimistic และเคลียร์รายการเลือก
+      setMsg("✅ จองสำเร็จ!");
+      const newKeys = selected.map((s) => `${s.court}:${s.hour}`);
+      setMine((prev) => [...prev, ...newKeys]);
+      setTaken((prev) => [...prev, ...newKeys]);
+      setSelected([]);
+      setNote("");
+
+      // ✅ ดึงสถานะจริงจากเซิร์ฟเวอร์อีกรอบ ป้องกัน desync
+      loadTakenMine();
+    } catch (err) {
+      console.error("Booking error:", err);
+      setMsg("❌ Server error");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    res.json({ message: "อัพเดตสถานะเรียบร้อย", booking });
-  } catch (err) {
-    console.error("❌ Update booking status error:", err.message);
-    res.status(500).json({ error: "Server error" });
- }
-});
+  const goHome = () => {
+    try { navigate("/"); } catch { window.location.href = "/"; }
+  };
 
+  return (
+    <div ref={viewportRef} style={ui.page}>
+      {/* ✅ ตัวคอนเทนต์จริง — จะถูกสเกลให้พอดีจออัตโนมัติ */}
+      <div ref={contentRef} style={ui.contentWrap}>
+        <div style={ui.container}>
+          {/* ซ้าย: ตาราง */}
+          <section style={ui.left}>
+            <div style={ui.toolbar}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" onClick={goHome} style={ui.backBtn} title="กลับหน้าแรก">
+                  ← กลับหน้าแรก
+                </button>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label htmlFor="date" style={ui.labelSm}>วันที่ (อัตโนมัติ)</label>
+                  {/* แสดงผลอย่างเดียว — เด้งเป็นวันใหม่ตอนเที่ยงคืน */}
+                  <input
+                    id="date"
+                    type="date"
+                    value={dateKey}
+                    disabled
+                    readOnly
+                    title="ระบบจะอัปเดตเป็นวันใหม่โดยอัตโนมัติทุกเที่ยงคืน"
+                    style={{ ...ui.dateInput, background: colors.primarySoft, borderColor: colors.primary }}
+                  />
+                  <span style={ui.badgeNote}>ตาราง “วันนี้” • อัปเดตอัตโนมัติเที่ยงคืน</span>
+                </div>
+              </div>
 
+              {/* Legend + ปุ่มรีเฟรช */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div style={ui.legendWrap} aria-hidden>
+                  <span style={ui.legendItem}><span style={ui.dotMine} /> ของฉัน</span>
+                  <span style={ui.legendItem}><span style={ui.dotPicked} /> เลือกแล้ว</span>
+                  <span style={ui.legendItem}><span style={ui.dotFree} /> ว่าง</span>
+                  <span style={ui.legendItem}><span style={ui.dotTaken} /> เต็ม</span>
+                </div>
 
-// ✅ ดึงการจองทั้งหมดของ user
-app.get("/api/bookings/user/:userId", async (req, res) => {
-  try {
-    const { userId } = req.params;
+                {/* ✅ ปุ่มรีเฟรชตอนนี้ */}
+                <button
+                  type="button"
+                  onClick={loadTakenMine}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 10,
+                    border: `1px solid ${colors.primaryDark}`,
+                    background: colors.primarySoft,
+                    color: colors.primaryDark,
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                  title="ดึงสถานะล่าสุดอีกครั้ง (เช่น มีคนยกเลิกจากฝั่งแอดมิน)"
+                >
+                  รีเฟรชตอนนี้
+                </button>
+              </div>
+            </div>
 
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ error: "ID ไม่ถูกต้อง" });
-    }
+            {/* ตารางคอร์ต x ชั่วโมง */}
+            <div style={ui.tableFrame}>
+              <div style={ui.headerRow}>
+                <div style={{ ...ui.headerCell, width: 140, textAlign: "left" }}>ช่วงเวลา</div>
+                {COURTS.map((c) => (
+                  <div key={c} style={ui.headerCell}>คอร์ต {c}</div>
+                ))}
+              </div>
 
-    const bookings = await Booking.find({ user: userId })
-      .sort({ date: -1, hour: 1 }); // เรียงวันที่ล่าสุดก่อน
+              <div role="table" aria-label="ตารางการจองคอร์ตแบดมินตัน" style={ui.bodyGrid}>
+                {HOURS.map((h, idx) => (
+                  <div key={h} role="row" style={{ ...ui.row, ...(idx % 2 === 1 ? ui.rowAlt : null) }}>
+                    <div role="cell" style={{ ...ui.timeCell }}>{formatHourLabel(h)}</div>
+                    {COURTS.map((c) => {
+                      const takenCell = isTaken(c, h);
+                      const mineCell  = isMine(c, h);
+                      const picked    = isSelected(c, h);
 
-    res.json({ bookings });
-  } catch (err) {
-    console.error("❌ User bookings error:", err.message);
-    res.status(500).json({ error: "Server error" });
-  }
-});
+                      const label = takenCell ? (mineCell ? "ของฉัน" : "เต็ม") : (picked ? "เลือกแล้ว" : "ว่าง");
+                      const styleForCell =
+                        takenCell ? (mineCell ? ui.cellMine : ui.cellTaken)
+                                  : (picked ? ui.cellPicked : ui.cellFree);
 
+                      const commonBtnStyle = { ...ui.cellBtn, ...styleForCell };
+                      const btnProps = mineCell
+                        ? { disabled: false, "aria-disabled": true, style: { ...commonBtnStyle, ...ui.mineNoDim } }
+                        : { disabled: takenCell, style: commonBtnStyle };
 
+                      return (
+                        <button
+                          key={`${c}:${h}`}
+                          onClick={() => toggleCell(c, h)}
+                          aria-pressed={picked}
+                          aria-label={`คอร์ต ${c} เวลา ${formatHourLabel(h)}: ${label}`}
+                          {...btnProps}
+                        >
+                          <span style={ui.statusPill(takenCell, picked, mineCell)}>{label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
 
-// ---------- Start Server ----------
-app.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
-});
+          {/* ขวา: สรุปการจอง */}
+          <aside style={ui.right}>
+            <div style={ui.card}>
+              <h2 style={ui.cardTitle}>สรุปการจอง</h2>
+              <div style={ui.summaryRow}><span>วันที่</span><b>{dateKey}</b></div>
+              <div style={ui.summaryRow}><span>จำนวนรายการ</span><b>{selected.length} ชั่วโมง</b></div>
+              <div style={ui.summaryRow}><span>ราคา/ชั่วโมง</span><b>{PRICE_PER_HOUR.toLocaleString()} บาท</b></div>
+              <div style={{ ...ui.summaryRow, borderTop: `1px dashed ${colors.line}`, paddingTop: 10, marginTop: 6 }}>
+                <span>รวมทั้งสิ้น</span>
+                <b style={{ color: colors.accent }}>
+                  {(selected.length * PRICE_PER_HOUR).toLocaleString()} บาท
+                </b>
+              </div>
+
+              <div style={{ marginTop: 12 }}>
+                <label htmlFor="note" style={ui.labelSm}>หมายเหตุ (ถ้ามี)</label>
+                <textarea
+                  id="note"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="เช่น ต้องการคอร์ตติดผนัง / เปิดไฟเพิ่ม"
+                  style={ui.textarea}
+                  rows={3}
+                />
+              </div>
+
+              <button
+                onClick={handleConfirm}
+                disabled={loading || !selected.length}
+                style={{ ...ui.confirmBtn, opacity: loading ? 0.75 : 1 }}
+              >
+                {loading ? "กำลังยืนยัน..." : "ยืนยันการจอง"}
+              </button>
+
+              {!!selected.length && (
+                <>
+                  <div style={{ marginTop: 14, fontSize: 13, color: colors.muted }}>รายการที่เลือก</div>
+                  <ul style={ui.selectedList}>
+                    {selected
+                      .slice()
+                      .sort((a, b) => a.court - b.court || a.hour - b.hour)
+                      .map((s, idx) => (
+                        <li key={idx} style={ui.selectedItem}>
+                          <span>คอร์ต {s.court}</span>
+                          <span>{formatHourLabel(s.hour)}</span>
+                          <button
+                            onClick={() => toggleCell(s.court, s.hour)}
+                            style={ui.removeBtn}
+                            title="เอาออก"
+                          >
+                            ✕
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                </>
+              )}
+
+              {msg && <div style={ui.message}>{msg}</div>}
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** ===== UI (ออกแบบให้สวย แล้วสเกลทั้งบล็อกให้พอดีจอ) ===== */
+const ui = {
+  page: {
+    minHeight: "100vh",
+    background: colors.bg,
+    color: colors.ink,
+    fontFamily:
+      'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans Thai", sans-serif',
+    padding: 8,
+    overflow: "hidden",
+  },
+
+  contentWrap: {
+    transform: "scale(1)",
+    transformOrigin: "top left",
+    width: "auto",
+  },
+
+  container: {
+    width: 1200,
+    margin: "0 auto",
+    display: "grid",
+    gridTemplateColumns: "1fr 340px",
+    gap: 16,
+  },
+
+  /* Left */
+  left: { minWidth: 0 },
+  toolbar: {
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 10,
+    flexWrap: "wrap",
+  },
+  backBtn: {
+    padding: "8px 12px",
+    borderRadius: 10,
+    border: `1px solid ${colors.lineStrong}`,
+    background: "#fff",
+    cursor: "pointer",
+    fontWeight: 700,
+  },
+  labelSm: { display: "block", fontSize: 13, fontWeight: 700, marginBottom: 6, color: colors.muted },
+  badgeNote: {
+    display: "inline-block",
+    fontSize: 12,
+    padding: "6px 10px",
+    borderRadius: 999,
+    background: colors.primarySoft,
+    color: colors.primaryDark,
+    border: `1px solid ${colors.primary}`,
+    width: "fit-content",
+  },
+  dateInput: {
+    padding: "10px 12px",
+    border: `1px solid ${colors.line}`,
+    borderRadius: 10,
+    background: "#fff",
+    fontSize: 14,
+    outline: "none",
+  },
+
+  /* Legend */
+  legendWrap: {
+    display: "flex",
+    alignItems: "center",
+    gap: 14,
+    background: "#fff",
+    padding: "8px 12px",
+    borderRadius: 999,
+    border: `1px solid ${colors.line}`,
+    boxShadow: "0 4px 18px rgba(2,6,12,.05)",
+    whiteSpace: "nowrap",
+  },
+  legendItem: { display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: colors.muted },
+  dotFree:  { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: "#fff", border: `1px solid ${colors.lineStrong}` },
+  dotPicked:{ display: "inline-block", width: 12, height: 12, borderRadius: 999, background: colors.primary, border: `1px solid ${colors.primaryDark}` },
+  dotTaken: { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: colors.taken, border: `1px solid ${colors.lineStrong}` },
+  dotMine:  { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: "#dcfce7", border: `1px solid ${colors.success}` },
+
+  /* กรอบตาราง */
+  tableFrame: {
+  background: colors.card,
+  border: `1px solid ${colors.lineStrong}`,
+  borderRadius: 16,
+  boxShadow: "0 12px 30px rgba(2,6,12,0.06)",
+  overflow: "hidden",
+},
+  headerRow: {
+    display: "grid",
+    gridTemplateColumns: `140px repeat(${COURTS.length}, 1fr)`,
+    borderBottom: `1px solid ${colors.lineStrong}`,
+    background: colors.primarySoft,
+    boxShadow: "inset 0 -1px 0 " + colors.lineStrong,
+  },
+  headerCell: {
+    padding: "12px 10px",
+    fontSize: 13,
+    fontWeight: 900,
+    textAlign: "center",
+    borderLeft: `1px solid ${colors.lineStrong}`,
+    color: colors.primaryDark,
+    letterSpacing: 0.2,
+  },
+
+  bodyGrid: {
+    display: "grid",
+    gridAutoFlow: "row",
+  },
+  row: {
+    display: "grid",
+    gridTemplateColumns: `140px repeat(${COURTS.length}, 1fr)`,
+    borderTop: `1px solid ${colors.line}`,
+  },
+  rowAlt: { background: "#fbfdfc" },
+  timeCell: {
+    padding: "12px 10px",
+    fontSize: 13,
+    textAlign: "left",
+    background: "#ffffff",
+    borderRight: `1px solid ${colors.lineStrong}`,
+    fontWeight: 700,
+  },
+
+  cellBtn: {
+    padding: "14px 8px",
+    fontSize: 13,
+    background: "#fff",
+    border: "none",
+    borderLeft: `1px solid ${colors.line}`,
+    cursor: "pointer",
+    transition: "transform .06s ease, box-shadow .12s ease, background .12s ease",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    outline: "none",
+  },
+  cellFree:   { background: "#fff" },
+  cellPicked: {
+    background: colors.primarySoft,
+    boxShadow: "inset 0 0 0 2px " + colors.primary,
+  },
+  cellTaken:  {
+    background: colors.taken,
+    color: "#9ca3af",
+    cursor: "not-allowed",
+  },
+  // ✅ สีเขียวสำหรับ “ของฉัน”
+  cellMine: {
+    background: "#bbf7d0", // เขียวสด (tailwind: green-300)
+    boxShadow: `inset 0 0 0 2px ${colors.success}`,
+    color: "#065f46",
+    fontWeight: 700,
+    cursor: "not-allowed",
+  },
+  // ป้องกันปุ่มซีด/หรี่เวลาเป็นของฉัน (ไม่ใช้ disabled จริง แต่ให้กดไม่ติด)
+  mineNoDim: {
+    pointerEvents: "none",
+    cursor: "not-allowed",
+    opacity: 1,
+    filter: "none",
+  },
+
+  statusPill: (isTaken, isPicked, isMine) => ({
+    fontSize: 12,
+    fontWeight: 800,
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: `1px solid ${
+      isMine ? colors.success
+      : isTaken ? colors.lineStrong
+      : isPicked ? colors.primaryDark
+      : colors.lineStrong
+    }`,
+    background: isMine
+      ? "#22c55e" // เขียวชัด
+      : (isTaken
+          ? "#f1f5f9"
+          : isPicked
+            ? "#dcfce7"
+            : "#ffffff"),
+    color: isMine ? "#fff" : (isTaken ? "#94a3b8" : isPicked ? colors.success : colors.ink),
+    letterSpacing: 0.2,
+  }),
+
+  /* Right */
+  right: { minWidth: 0 },
+  card: {
+    background: colors.card,
+    border: `1px solid ${colors.line}`,
+    borderRadius: 16,
+    boxShadow: "0 12px 30px rgba(2,6,12,0.06)",
+    padding: 14,
+    position: "sticky",
+    top: 0,
+  },
+  cardTitle: { margin: 0, fontSize: 18, fontWeight: 900, color: colors.primaryDark },
+  summaryRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    fontSize: 14,
+    marginTop: 10,
+  },
+  textarea: {
+    width: "100%",
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: `1px solid ${colors.line}`,
+    outline: "none",
+    fontSize: 14,
+    lineHeight: "1.5",
+    background: "#fff",
+    resize: "vertical",
+    boxSizing: "border-box",
+  },
+  confirmBtn: {
+    width: "100%",
+    marginTop: 12,
+    padding: "12px 14px",
+    background: colors.primaryDark,
+    color: "#fff",
+    border: "none",
+    borderRadius: 12,
+    cursor: "pointer",
+    fontWeight: 800,
+    fontSize: 15,
+  },
+  selectedList: {
+    marginTop: 8,
+    listStyle: "none",
+    padding: 0,
+    borderTop: `1px solid ${colors.line}`,
+  },
+  selectedItem: {
+    display: "grid",
+    gridTemplateColumns: "auto 1fr auto",
+    gap: 8,
+    alignItems: "center",
+    padding: "8px 0",
+    fontSize: 13,
+    borderBottom: `1px dashed ${colors.line}`,
+  },
+  removeBtn: {
+    background: "transparent",
+    border: `1px solid ${colors.line}`,
+    borderRadius: 8,
+    padding: "2px 8px",
+    cursor: "pointer",
+  },
+  message: {
+    marginTop: 10,
+    fontSize: 14,
+    textAlign: "center",
+    color: colors.accent,
+  },
+};

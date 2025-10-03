@@ -1,5 +1,5 @@
 // src/Details.jsx
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
@@ -66,6 +66,12 @@ export default function Details() {
   const [scale, setScale] = useState(1);
   const viewportRef = useRef(null);
   const contentRef = useRef(null);
+
+  // เก็บ user ไว้ reuse
+  const userRef = useRef(null);
+  useEffect(() => {
+    userRef.current = JSON.parse(localStorage.getItem("auth:user") || "{}");
+  }, []);
 
   // คำนวณ scale เมื่อโหลด/เปลี่ยนขนาดหน้าต่าง/เนื้อหา
   useLayoutEffect(() => {
@@ -149,39 +155,59 @@ export default function Details() {
     setMsg("");
   }, [dateKey]);
 
-  // โหลดสถานะจอง (รวม “ของฉัน”) เมื่อวันเปลี่ยน
+  /** ========= โหลดสถานะจอง (taken + mine) =========
+   *  ใช้ซ้ำได้ทั้งจากปุ่ม "รีเฟรช" / โฟกัสหน้าต่าง / interval
+   */
+  const loadTakenMine = useCallback(async () => {
+    try {
+      const user = userRef.current || JSON.parse(localStorage.getItem("auth:user") || "{}");
+
+      const [tRes, mRes] = await Promise.all([
+        fetch(ENDPOINTS.taken(dateKey), { cache: "no-store" }),
+        user?._id
+          ? fetch(ENDPOINTS.mine(dateKey, user._id), { cache: "no-store" }).catch(() => null)
+          : Promise.resolve(null),
+      ]);
+
+      // taken
+      if (tRes?.ok) {
+        const tJson = await tRes.json();
+        setTaken(Array.isArray(tJson?.taken) ? tJson.taken : []);
+      } else {
+        setTaken([]);
+      }
+
+      // mine
+      if (mRes && mRes.ok) {
+        const mJson = await mRes.json();
+        setMine(Array.isArray(mJson?.mine) ? mJson.mine : []);
+      } else {
+        setMine([]);
+      }
+    } catch (err) {
+      console.error("Load bookings error:", err);
+      // ไม่ขึ้น error บ่อยเกินไป รบกวนผู้ใช้
+    }
+  }, [dateKey]);
+
+  // โหลดครั้งแรก + ตั้ง interval (polling) + โหลดเมื่อหน้าต่างโฟกัส
   useEffect(() => {
     let cancelled = false;
+    loadTakenMine();
+    const onFocus = () => loadTakenMine();
+    window.addEventListener("focus", onFocus);
 
-    const load = async () => {
-      try {
-        const [tRes, user] = await Promise.all([
-          fetch(ENDPOINTS.taken(dateKey)),
-          Promise.resolve(JSON.parse(localStorage.getItem("auth:user") || "{}")),
-        ]);
-        const tJson = await tRes.json();
-        if (!cancelled) setTaken(tJson.taken || []);
+    // ปรับช่วงเวลาได้ตามต้องการ (เช่น 7–15 วินาที)
+    const intervalId = setInterval(() => {
+      if (!cancelled) loadTakenMine();
+    }, 10000);
 
-        if (user?._id) {
-          try {
-            const mRes = await fetch(ENDPOINTS.mine(dateKey, user._id));
-            if (!mRes.ok) throw new Error("mine endpoint not available");
-            const mJson = await mRes.json();
-            if (!cancelled) setMine(mJson.mine || []);
-          } catch {
-            if (!cancelled) setMine([]); // fallback ถ้ายังไม่มี endpoint
-          }
-        } else {
-          if (!cancelled) setMine([]);
-        }
-      } catch (err) {
-        console.error("Load bookings error:", err);
-      }
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      clearInterval(intervalId);
     };
-
-    load();
-    return () => { cancelled = true; };
-  }, [dateKey]);
+  }, [loadTakenMine]);
 
   const formatHourLabel = (h) => `${h.toString().padStart(2, "0")}:00 - ${h + 1}:00`;
   const isTaken = (c, h) => taken.includes(`${c}:${h}`);
@@ -198,56 +224,58 @@ export default function Details() {
   };
 
   const handleConfirm = async () => {
-  setLoading(true);
-  setMsg("");
-  try {
-    const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
-    const token = localStorage.getItem("auth:token");   // ✅ ดึง token
-    
-    if (!user?._id || !token) {
-      setMsg("❌ กรุณาเข้าสู่ระบบก่อนจอง");
-      setLoading(false);
-      return;
-    }
-
-    for (const s of selected) {
-      const res = await fetch(ENDPOINTS.create, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,   // ✅ ส่ง token ให้ backend
-        },
-        body: JSON.stringify({
-          date: dateKey,
-          court: s.court,
-          hour: s.hour,
-          note,  // ถ้ามีหมายเหตุ
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setMsg(`❌ จองคอร์ต ${s.court} เวลา ${formatHourLabel(s.hour)} ไม่สำเร็จ: ${data.error || "unknown"}`);
+    setLoading(true);
+    setMsg("");
+    try {
+      const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
+      const token = localStorage.getItem("auth:token");   // ✅ ดึง token
+      
+      if (!user?._id || !token) {
+        setMsg("❌ กรุณาเข้าสู่ระบบก่อนจอง");
         setLoading(false);
         return;
       }
+
+      for (const s of selected) {
+        const res = await fetch(ENDPOINTS.create, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,   // ✅ ส่ง token ให้ backend
+          },
+          body: JSON.stringify({
+            date: dateKey,
+            court: s.court,
+            hour: s.hour,
+            note,  // ถ้ามีหมายเหตุ
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          setMsg(`❌ จองคอร์ต ${s.court} เวลา ${formatHourLabel(s.hour)} ไม่สำเร็จ: ${data.error || "unknown"}`);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // ✅ อัพเดต state แบบ optimistic และเคลียร์รายการเลือก
+      setMsg("✅ จองสำเร็จ!");
+      const newKeys = selected.map((s) => `${s.court}:${s.hour}`);
+      setMine((prev) => [...prev, ...newKeys]);
+      setTaken((prev) => [...prev, ...newKeys]);
+      setSelected([]);
+      setNote("");
+
+      // ✅ ดึงสถานะจริงจากเซิร์ฟเวอร์อีกรอบ ป้องกัน desync
+      loadTakenMine();
+    } catch (err) {
+      console.error("Booking error:", err);
+      setMsg("❌ Server error");
+    } finally {
+      setLoading(false);
     }
-
-    // ✅ อัพเดต state
-    setMsg("✅ จองสำเร็จ!");
-    setMine((prev) => [...prev, ...selected.map((s) => `${s.court}:${s.hour}`)]);
-    setTaken((prev) => [...prev, ...selected.map((s) => `${s.court}:${s.hour}`)]);
-    setSelected([]);
-    setNote("");
-
-  } catch (err) {
-    console.error("Booking error:", err);
-    setMsg("❌ Server error");
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   const goHome = () => {
     try { navigate("/"); } catch { window.location.href = "/"; }
@@ -281,12 +309,32 @@ export default function Details() {
                 </div>
               </div>
 
-              {/* Legend สถานะ */}
-              <div style={ui.legendWrap} aria-hidden>
-                <span style={ui.legendItem}><span style={ui.dotMine} /> ของฉัน</span>
-                <span style={ui.legendItem}><span style={ui.dotPicked} /> เลือกแล้ว</span>
-                <span style={ui.legendItem}><span style={ui.dotFree} /> ว่าง</span>
-                <span style={ui.legendItem}><span style={ui.dotTaken} /> เต็ม</span>
+              {/* Legend + ปุ่มรีเฟรช */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div style={ui.legendWrap} aria-hidden>
+                  <span style={ui.legendItem}><span style={ui.dotMine} /> ของฉัน</span>
+                  <span style={ui.legendItem}><span style={ui.dotPicked} /> เลือกแล้ว</span>
+                  <span style={ui.legendItem}><span style={ui.dotFree} /> ว่าง</span>
+                  <span style={ui.legendItem}><span style={ui.dotTaken} /> เต็ม</span>
+                </div>
+
+                {/* ✅ ปุ่มรีเฟรชตอนนี้ */}
+                <button
+                  type="button"
+                  onClick={loadTakenMine}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 10,
+                    border: `1px solid ${colors.primaryDark}`,
+                    background: colors.primarySoft,
+                    color: colors.primaryDark,
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                  title="ดึงสถานะล่าสุดอีกครั้ง (เช่น มีคนยกเลิกจากฝั่งแอดมิน)"
+                >
+                  รีเฟรชตอนนี้
+                </button>
               </div>
             </div>
 
@@ -487,12 +535,12 @@ const ui = {
 
   /* กรอบตาราง */
   tableFrame: {
-    background: colors.card,
-    border: `1px solid ${colors.lineStrong}`,
-    borderRadius: 16,
-    boxShadow: "0 12px 30px rgba(2,6,12,0.06)",
-    overflow: "hidden",
-  },
+  background: colors.card,
+  border: `1px solid ${colors.lineStrong}`,
+  borderRadius: 16,
+  boxShadow: "0 12px 30px rgba(2,6,12,0.06)",
+  overflow: "hidden",
+},
   headerRow: {
     display: "grid",
     gridTemplateColumns: `140px repeat(${COURTS.length}, 1fr)`,

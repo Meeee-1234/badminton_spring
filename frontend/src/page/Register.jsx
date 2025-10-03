@@ -5,18 +5,10 @@ import { FiEye, FiEyeOff } from "react-icons/fi";
 
 const API = process.env.REACT_APP_API_URL || "https://badminton-mongo.onrender.com";
 
-const colors = {
-  primary: "#10B981",
-  primaryDark: "#059669",
-  ink: "#0f172a",
-  muted: "#64748b",
-  line: "#e5e7eb",
-  card: "#ffffff",
-  bg: "#f8fafc",
-};
-
 export default function Register() {
+
   const navigate = useNavigate();
+
   const [form, setForm] = useState({ name: "", email: "", phone: "", password: "" });
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
@@ -29,9 +21,8 @@ export default function Register() {
     e.preventDefault();
     setMessage("");
 
-    // ✅ ตรวจสอบว่ารหัสผ่านตรงกันมั้ย
     if (form.password !== form.confirmPassword) {
-      setMessage("❌ รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน");
+      setMessage("รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน");
       return;
     }
 
@@ -110,23 +101,14 @@ export default function Register() {
           <div style={ui.field}>
             <label htmlFor="confirmPassword" style={ui.label}>Confirm Password  <span style={ui.note}>กรอกรหัสผ่านอีกครั้ง</span></label>
             <div style={ui.inputWrap}>
-              <input id="confirmPassword" type={showConfirmPw ? "text" : "password"} name="confirmPassword"
-                value={form.confirmPassword}
-                onChange={handleChange}
-                required
-                autoComplete="new-password"
-                style={ui.input}
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPw(v => !v)}
-                style={ui.eyeBtn}
-              >
+              <input id="confirmPassword" type={showConfirmPw ? "text" : "password"} name="confirmPassword" style={ui.input}
+                     value={form.confirmPassword} onChange={handleChange} autoComplete="new-password" required />
+              
+              <button type="button" onClick={() => setShowConfirmPw(v => !v)} style={ui.eyeBtn} >
                 {showConfirmPw ? <FiEyeOff /> : <FiEye />}
               </button>
             </div>
           </div>
-
 
           <button type="submit" style={{ ...ui.button, opacity: loading ? 0.7 : 1 }} disabled={loading}>
             {loading ? "กำลังสมัคร..." : "สมัครสมาชิก"}
@@ -142,6 +124,18 @@ export default function Register() {
     </div>
   );
 }
+
+
+
+const colors = {
+  primary: "#10B981",
+  primaryDark: "#059669",
+  ink: "#0f172a",
+  muted: "#64748b",
+  line: "#e5e7eb",
+  card: "#ffffff",
+  bg: "#f8fafc",
+};
 
 const ui = {
   page: {

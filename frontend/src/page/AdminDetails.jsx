@@ -2,7 +2,8 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
+const API =
+  process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
 
 /* ================= THEME (โทนเดียวกับ Details.jsx) ================ */
 const C = {
@@ -33,27 +34,46 @@ const toDateKey = (d = new Date()) => {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 };
-const timeLabel = (h) => `${String(h).padStart(2, "0")}:00 - ${String(h + 1).padStart(2, "0")}:00`;
+const timeLabel = (h) =>
+  `${String(h).padStart(2, "0")}:00 - ${String(h + 1).padStart(2, "0")}:00`;
 
 const ENDPOINTS = {
   list: (date) => `${API}/api/admin/bookings?date=${encodeURIComponent(date)}`,
   setStatus: (id) => `${API}/api/admin/bookings/${id}/status`,
 };
 
+/* ============== EMIT UPDATE ============== */
+const emitUpdate = (date) => {
+  try {
+    if ("BroadcastChannel" in window) {
+      const bc = new BroadcastChannel("booking-events");
+      bc.postMessage({ type: "booking-updated", date });
+      bc.close();
+    }
+  } catch {}
+  try {
+    localStorage.setItem(
+      "booking:updated",
+      JSON.stringify({ date, t: Date.now() })
+    );
+  } catch {}
+};
+
 /* ================ NORMALIZERS ================ */
 function normalizeStatus(raw) {
   const v = String(raw || "").toLowerCase();
   if (v === "checked_in" || v === "arrived") return "checked_in";
-  if (v === "cancelled" || v === "canceled") return "cancelled";
+  if (v === "canceled" || v === "cancelled") return "canceled";
   return "booked";
 }
+
 function normalizeOne(b) {
   return {
     _id: b._id || b.id,
     court: Number(b.court),
     hour: Number(b.hour),
     status: normalizeStatus(b.status),
-    userName: b.userName || b.username || b.name || b.user?.name || "-",
+    userName: b.user?.name || b.userName || b.username || b.name || "-",
     note: b.note || "",
     date: b.date || b.bookingDate || null,
   };
@@ -65,6 +85,20 @@ function pickListShape(data) {
   return [];
 }
 
+/* ============== STATUS BADGE ============== */
+function statusBadge(status) {
+  switch (status) {
+    case "booked":
+      return { label: "จองแล้ว", bg: "#eff6ff", bd: "#3b82f6", ink: "#1e40af" };
+    case "checked_in":
+      return { label: "มาแล้ว", bg: "#dcfce7", bd: "#16a34a", ink: "#065f46" };
+    case "canceled":
+      return { label: "ยกเลิก", bg: "#fee2e2", bd: "#ef4444", ink: "#7f1d1d" };
+    default:
+      return { label: status, bg: "#f3f4f6", bd: "#d1d5db", ink: "#374151" };
+  }
+}
+
 /* ================ MAIN ================= */
 export default function AdminDetails() {
   const navigate = useNavigate();
@@ -73,141 +107,199 @@ export default function AdminDetails() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
-  const [filter, setFilter] = useState("all"); // all | booked | checked_in | cancelled
+  const [filter, setFilter] = useState("all"); // all | booked | checked_in | canceled
+  const [refreshTs, setRefreshTs] = useState(Date.now());
 
-  // ===== ดึงข้อมูลการจอง "เฉพาะวันที่เลือก" =====
+  // ✅ ช่องค้นหาชื่อ
+  const [q, setQ] = useState("");
+
+  const fetchList = async () => {
+    setLoading(true);
+    setMsg("");
+    try {
+      const ts = Date.now();
+      const token = localStorage.getItem("auth:token");
+      const res = await fetch(`${ENDPOINTS.list(dateKey)}&_=${ts}`, {
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+          "Cache-Control": "no-cache",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const text = await res.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch {}
+
+      if (!res.ok) throw new Error(`[${res.status}] ${data?.error || text || "โหลดข้อมูลล้มเหลว"}`);
+
+      const list = pickListShape(data)
+        .map(normalizeOne)
+        .filter((b) => !b.date || b.date.startsWith(dateKey));
+
+      setBookings(list);
+    } catch (e) {
+      setMsg(`❌ โหลดข้อมูลไม่สำเร็จ: ${e.message || String(e)}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     let aborted = false;
     (async () => {
-      setLoading(true);
-      setMsg("");
-      try {
-        const token = localStorage.getItem("auth:token");
-        const res = await fetch(ENDPOINTS.list(dateKey), {
-          cache: "no-store",
-          headers: {
-            Accept: "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-
-        const text = await res.text();
-        let data = null;
-        try { data = JSON.parse(text); } catch {}
-
-        if (!res.ok) throw new Error(`[${res.status}] ${data?.error || text || "โหลดข้อมูลล้มเหลว"}`);
-
-        // กรองซ้ำกันพลาด (ถ้า backend เผื่อส่งหลายวัน)
-        const list = pickListShape(data)
-          .map(normalizeOne)
-          .filter((b) => !b.date || b.date.startsWith(dateKey));
-
-        if (!aborted) setBookings(list);
-      } catch (e) {
-        if (!aborted) setMsg(`❌ โหลดข้อมูลไม่สำเร็จ: ${e.message || String(e)}`);
-      } finally {
-        if (!aborted) setLoading(false);
-      }
+      if (!aborted) await fetchList();
     })();
-    return () => { aborted = true; };
-  }, [dateKey]);
+    return () => {
+      aborted = true;
+    };
+  }, [dateKey, refreshTs]);
 
-  // court:hour -> booking
+  // ✅ กรองตามสถานะ + คำค้นชื่อ (ไม่สนตัวพิมพ์)
+  const filtered = useMemo(() => {
+    let arr = filter === "all" ? bookings : bookings.filter((b) => b.status === filter);
+    const kw = q.trim().toLowerCase();
+    if (kw) {
+      arr = arr.filter((b) => (b.userName || "-").toLowerCase().includes(kw));
+    }
+    return arr;
+  }, [bookings, filter, q]);
+
+  // ✅ ตารางซ้าย: ใช้เฉพาะที่ไม่ใช่ canceled (เพื่อไม่บล็อกช่อง) และยังคงเคารพคำค้น
   const bookingsMap = useMemo(() => {
     const map = {};
-    for (const b of bookings) map[`${b.court}:${b.hour}`] = b;
-    return map;
-  }, [bookings]);
-
-  const filtered = useMemo(
-    () => (filter === "all" ? bookings : bookings.filter((b) => b.status === filter)),
-    [bookings, filter]
-  );
-
-  const statusBadge = (st) => {
-    if (st === "checked_in")
-      return { label: "มาแล้ว", bg: "#dcfce7", bd: C.success, ink: "#065f46" };
-    if (st === "cancelled")
-      return { label: "ยกเลิก", bg: "#fee2e2", bd: C.danger, ink: "#7f1d1d" };
-    return { label: "จองแล้ว", bg: "#eef2ff", bd: "#93c5fd", ink: "#1e3a8a" };
-  };
-
-  const setStatus = async (id, next) => {
-  try {
-    const token = localStorage.getItem("auth:token");
-    const res = await fetch(ENDPOINTS.setStatus(id), {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ status: next }),
-    });
-    const text = await res.text();
-    let data = null; try { data = JSON.parse(text); } catch {}
-    if (!res.ok) throw new Error(data?.error || text || "อัปเดตไม่สำเร็จ");
-
-    // ✅ ถ้าเป็นยกเลิก → ลบออกจาก state เลย
-    if (next === "cancelled") {
-      setBookings((prev) => prev.filter((b) => b._id !== id));
-    } else {
-      // ถ้าเป็นมาแล้ว → อัปเดตสถานะ
-      setBookings((prev) => prev.map((b) => (b._id === id ? { ...b, status: next } : b)));
+    for (const b of filtered) {
+      if (b.status !== "canceled") {
+        map[`${b.court}:${b.hour}`] = b;
+      }
     }
+    return map;
+  }, [filtered]);
 
-    setMsg("✅ อัปเดตสำเร็จ");
-  } catch (e) {
-    setMsg(`❌ อัปเดตไม่สำเร็จ: ${e.message || String(e)}`);
-  }
-};
+  const setStatus = async (id, status) => {
+    try {
+      const token = localStorage.getItem("auth:token");
+      const res = await fetch(ENDPOINTS.setStatus(id), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status }),
+      });
 
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "อัพเดตสถานะล้มเหลว");
+
+      const newStatus = normalizeStatus(status);
+
+      if (newStatus === "canceled") {
+        setBookings((prev) => prev.filter((b) => b._id !== id));
+        setMsg("✅ ยกเลิกแล้ว ช่องนี้ว่างให้คนอื่นจองได้");
+      } else {
+        setBookings((prev) =>
+          prev.map((b) => (b._id === id ? { ...b, status: newStatus } : b))
+        );
+        setMsg("✅ อัพเดตสถานะสำเร็จ");
+      }
+
+      emitUpdate(dateKey);
+    } catch (err) {
+      setMsg("❌ " + (err.message || String(err)));
+      console.error(err);
+    }
+  };
 
   return (
     <div style={sx.page}>
       {/* Header */}
       <div style={sx.header}>
         <div style={sx.leftTools}>
-          <button onClick={() => navigate("/")} style={sx.btnGhost}>← กลับหน้าแรก</button>
+          <button onClick={() => navigate("/")} style={sx.btnGhost}>
+            ← กลับหน้าแรก
+          </button>
 
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <label htmlFor="date" style={sx.label}>วันที่</label>
+            <label htmlFor="date" style={sx.label}>
+              วันที่
+            </label>
             <input
               id="date"
               type="date"
               value={dateKey}
-              onChange={(e) => /^\d{4}-\d{2}-\d{2}$/.test(e.target.value) && setDateKey(e.target.value)}
+              onChange={(e) =>
+                /^\d{4}-\d{2}-\d{2}$/.test(e.target.value) && setDateKey(e.target.value)
+              }
               style={sx.input}
             />
-            <button style={sx.btnGhost} onClick={() => setDateKey(toDateKey(new Date()))}>วันนี้</button>
+            <button style={sx.btnGhost} onClick={() => setDateKey(toDateKey(new Date()))}>
+              วันนี้
+            </button>
+            <button
+              style={{
+                ...sx.btnGhost,
+                fontWeight: 900,
+                borderColor: C.primaryDark,
+                color: C.primaryDark,
+              }}
+              onClick={() => setRefreshTs(Date.now())}
+              title="ดึงรายการล่าสุดตอนนี้"
+            >
+              รีเฟรชตอนนี้
+            </button>
           </div>
         </div>
 
-        <div style={sx.filterWrap}>
-          <span style={sx.filterTitle}>สถานะ:</span>
-          {[
-            { k: "all", t: "ทั้งหมด" },
-            { k: "booked", t: "จองแล้ว" },
-            { k: "checked_in", t: "มาแล้ว" },
-            { k: "cancelled", t: "ยกเลิก" },
-          ].map((it) => (
-            <button
-              key={it.k}
-              style={sx.chip(filter === it.k)}
-              onClick={() => setFilter(it.k)}
-            >
-              {it.t}
-            </button>
-          ))}
+        <div style={sx.rightToolsWrap}>
+          {/* ✅ ช่อง Search */}
+          <div style={sx.searchWrap}>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="ค้นหาชื่อผู้จอง…"
+              style={sx.searchInput}
+            />
+            {q && (
+              <button onClick={() => setQ("")} style={sx.searchClear} title="ล้างคำค้น">
+                ×
+              </button>
+            )}
+          </div>
+
+          <div style={sx.filterWrap}>
+            <span style={sx.filterTitle}>สถานะ:</span>
+            {[
+              { k: "all", t: "ทั้งหมด" },
+              { k: "booked", t: "จองแล้ว" },
+              { k: "checked_in", t: "มาแล้ว" },
+              { k: "canceled", t: "ยกเลิก" },
+            ].map((it) => (
+              <button
+                key={it.k}
+                style={sx.chip(filter === it.k)}
+                onClick={() => setFilter(it.k)}
+              >
+                {it.t}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Layout (เท่ากับ Details.jsx) */}
+      {/* Layout */}
       <div style={sx.layout}>
         {/* ตาราง */}
         <section style={sx.card}>
           <div style={sx.tableHeaderSticky}>
             <div style={{ ...sx.th, textAlign: "left" }}>ช่วงเวลา</div>
-            {COURTS.map((c) => (<div key={c} style={sx.th}>คอร์ต {c}</div>))}
+            {COURTS.map((c) => (
+              <div key={c} style={sx.th}>
+                คอร์ต {c}
+              </div>
+            ))}
           </div>
 
           <div>
@@ -218,8 +310,8 @@ export default function AdminDetails() {
                 {COURTS.map((c) => {
                   const b = bookingsMap[`${c}:${h}`];
 
-                  // ว่างหรือไม่ผ่าน filter
-                  if (!b || (filter !== "all" && b.status !== filter)) {
+                  // ถ้าไม่มี booking ที่ผ่านตัวกรอง/คำค้น ให้แสดงว่าง
+                  if (!b) {
                     return (
                       <div key={c} style={sx.td}>
                         <div style={sx.cellEmpty}>–</div>
@@ -234,7 +326,6 @@ export default function AdminDetails() {
                       style={sx.td}
                       title={`${b.userName || "-"} • คอร์ต ${b.court} • ${timeLabel(b.hour)}`}
                     >
-                      {/* ✅ เฉพาะชื่อ + สถานะ และบังคับให้ช่องสูงเท่ากัน/จัดกลาง */}
                       <div style={sx.cellFilled(st)}>
                         <span style={sx.name}>{b.userName || "-"}</span>
                         <span
@@ -260,35 +351,67 @@ export default function AdminDetails() {
         <aside style={sx.cardSide}>
           <div style={sx.sideHead}>
             <h3 style={sx.sideTitle}>รายการ {dateKey}</h3>
-            <div style={{ color: C.muted, fontSize: 13 }}>ทั้งหมด <b>{filtered.length}</b> รายการ</div>
+            <div style={{ color: C.muted, fontSize: 13 }}>
+              ทั้งหมด <b>{filtered.length}</b> รายการ
+            </div>
           </div>
 
           <div style={{ display: "grid", gap: 10 }}>
             {loading ? (
               <div style={{ color: C.muted }}>กำลังโหลด...</div>
             ) : filtered.length === 0 ? (
-              <div style={{ color: C.muted }}>ไม่มีรายการ</div>
+              <div style={{ color: C.muted }}>
+                {q.trim() ? "ไม่พบชื่อที่ค้นหา" : "ไม่มีรายการ"}
+              </div>
             ) : (
-              filtered.slice().sort((a, b) => a.court - b.court || a.hour - b.hour).map((b) => {
-                const st = statusBadge(b.status);
-                return (
-                  <div key={b._id} style={sx.sideItem}>
-                    <div style={sx.rowBetween}>
-                      <div>
-                        <div style={{ fontWeight: 900 }}>{b.userName || "-"}</div>
-                        <div style={{ color: C.muted, fontSize: 13 }}>คอร์ต {b.court} • {timeLabel(b.hour)}</div>
+              filtered
+                .slice()
+                .sort((a, b) => a.court - b.court || a.hour - b.hour)
+                .map((b) => {
+                  const st = statusBadge(b.status);
+                  return (
+                    <div key={b._id} style={sx.sideItem}>
+                      <div style={sx.rowBetween}>
+                        <div>
+                          <div style={{ fontWeight: 900 }}>{b.userName || "-"}</div>
+                          <div style={{ color: C.muted, fontSize: 13 }}>
+                            คอร์ต {b.court} • {timeLabel(b.hour)}
+                          </div>
+                        </div>
+                        <span
+                          style={{
+                            ...sx.badge,
+                            background: st.bg,
+                            borderColor: st.bd,
+                            color: st.ink,
+                          }}
+                        >
+                          {st.label}
+                        </span>
                       </div>
-                      <span style={{ ...sx.badge, background: st.bg, borderColor: st.bd, color: st.ink }}>{st.label}</span>
-                    </div>
 
-                    {/* ปุ่มเปลี่ยนสถานะ — อยู่ฝั่งขวาเท่านั้น */}
-                    <div style={sx.btnRow}>
-                      <button style={sx.btnPrimary} onClick={() => setStatus(b._id, "checked_in")} disabled={b.status === "checked_in"}>✓ มาแล้ว</button>
-                      <button style={sx.btnWarn} onClick={() => setStatus(b._id, "cancelled")} disabled={b.status === "cancelled"}>⨯ ยกเลิก</button>
+                      <div style={sx.btnRow}>
+                        <button
+                          style={sx.btnPrimary}
+                          onClick={() => setStatus(b._id, "arrived")}
+                          disabled={b.status === "checked_in" || b.status === "arrived"}
+                          title="ทำเครื่องหมายว่า 'มาแล้ว'"
+                        >
+                          ✓ มาแล้ว
+                        </button>
+
+                        <button
+                          style={sx.btnWarn}
+                          onClick={() => setStatus(b._id, "canceled")}
+                          disabled={b.status === "canceled"}
+                          title="ยกเลิกรายการนี้"
+                        >
+                          ⨯ ยกเลิก
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })
             )}
           </div>
 
@@ -319,6 +442,43 @@ const sx = {
     flexWrap: "wrap",
   },
   leftTools: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" },
+
+  rightToolsWrap: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+
+  // ✅ สไตล์ Search
+  searchWrap: {
+    position: "relative",
+  },
+  searchInput: {
+    padding: "10px 36px 10px 12px",
+    border: `1px solid ${C.line2}`,
+    borderRadius: 10,
+    background: "#fff",
+    fontSize: 14,
+    outline: "none",
+    minWidth: 220,
+  },
+  searchClear: {
+    position: "absolute",
+    right: 6,
+    top: "50%",
+    transform: "translateY(-50%)",
+    border: `1px solid ${C.line2}`,
+    background: "#fff",
+    borderRadius: 8,
+    width: 24,
+    height: 24,
+    lineHeight: "22px",
+    textAlign: "center",
+    cursor: "pointer",
+    fontWeight: 900,
+    color: C.muted,
+  },
 
   btnGhost: {
     padding: "8px 12px",
@@ -383,7 +543,7 @@ const sx = {
     fontSize: 13,
   }),
 
-  /* === เท่ากับ Details.jsx === */
+  /* Layout */
   layout: {
     width: 1200,
     margin: "0 auto",
@@ -437,19 +597,19 @@ const sx = {
     alignItems: "center",
   },
 
-  // ✅ กรอบเซลล์ — ให้ทุกช่องสูงเท่ากันและจัดกลาง
+  // กรอบเซลล์
   td: {
     padding: 0,
     borderLeft: `1px solid ${C.line}`,
-    minHeight: 72,                // ความสูงขั้นต่ำเท่ากันทุก cell
+    minHeight: 72,
     boxSizing: "border-box",
-    display: "flex",              // จัดกึ่งกลาง
+    display: "flex",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
   },
 
-  // ✅ คอนเทนต์ภายใน cell
+  // คอนเทนต์ใน cell
   cellFilled: (st) => ({
     display: "flex",
     flexDirection: "column",
@@ -491,7 +651,12 @@ const sx = {
     textOverflow: "ellipsis",
   },
 
-  rowBetween: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  rowBetween: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
 
   /* Sidebar */
   cardSide: {

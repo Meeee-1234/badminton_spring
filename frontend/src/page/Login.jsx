@@ -1,22 +1,14 @@
-// src/Login.jsx
+
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiEye, FiEyeOff } from "react-icons/fi"; // 👁️ ใช้ react-icons
 
 const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
 
-const colors = {
-  primary: "#10B981",      // เขียวหลัก
-  primaryDark: "#059669",  // เขียว hover
-  ink: "#0f172a",
-  muted: "#64748b",
-  line: "#e5e7eb",
-  card: "#ffffff",
-  bg: "#f8fafc",
-};
-
 export default function Login() {
+
   const navigate = useNavigate();
+
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPw, setShowPw] = useState(false);
   const [message, setMessage] = useState("");
@@ -53,55 +45,31 @@ export default function Login() {
     }
   };
 
-  
-
   return (
     <div style={ui.page}>
       <div style={ui.card}>
-        <h1 style={ui.title}>เข้าสู่ระบบ</h1>
+        <h1 style={ui.title}>Login</h1>
         <p style={ui.sub}>กรอกข้อมูลเพื่อเข้าใช้งาน</p>
 
         <form onSubmit={handleSubmit} style={{ marginTop: 20 }}>
-          {/* Email */}
           <div style={ui.field}>
             <label htmlFor="email" style={ui.label}>Email</label>
             <div style={ui.inputWrap}>
-              <input
-                id="email"
-                type="email"
-                name="email"
-                placeholder="you@example.com"
-                value={form.email}
-                onChange={handleChange}
-                required
-                autoComplete="email"
-                style={ui.input}
-              />
+              <input id="email" type="email" name="email" style={ui.input}
+                     value={form.email} onChange={handleChange} autoComplete="email" required />
             </div>
           </div>
 
-          {/* Password */}
           <div style={ui.field}>
             <label htmlFor="password" style={ui.label}>Password</label>
             <div style={ui.inputWrap}>
-              <input
-                id="password"
-                type={showPw ? "text" : "password"}
-                name="password"
-                placeholder="••••••••"
-                value={form.password}
-                onChange={handleChange}
-                required
-                autoComplete="current-password"
-                style={ui.input}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPw(v => !v)}
-                style={ui.eyeBtn}
-                aria-label={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
-                title={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
-              >
+              <input id="password" type={showPw ? "text" : "password"} name="password" style={ui.input}
+                     value={form.password} onChange={handleChange} autoComplete="current-password" required />
+              
+              <button type="button" style={ui.eyeBtn} 
+                      onClick={() => setShowPw(v => !v)}
+                      aria-label={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"} 
+                      title={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"} >
                 {showPw ? <FiEyeOff /> : <FiEye />}
               </button>
             </div>
@@ -121,6 +89,16 @@ export default function Login() {
     </div>
   );
 }
+
+const colors = {
+  primary: "#10B981",     
+  primaryDark: "#059669",
+  ink: "#0f172a",
+  muted: "#64748b",
+  line: "#e5e7eb",
+  card: "#ffffff",
+  bg: "#f8fafc",
+};
 
 const ui = {
   page: {
@@ -143,10 +121,10 @@ const ui = {
     boxShadow: "0 10px 30px rgba(2,6,12,0.06)",
     padding: "28px 32px", // ซ้าย-ขวาเท่ากัน
   },
-  title: { margin: 0, fontSize: 24, fontWeight: 800, color: colors.ink, textAlign: "center" },
+  title: { margin: 0, fontWeight: 800, color: colors.ink, textAlign: "center" },
   sub: { margin: "6px 0 0 0", color: colors.muted, fontSize: 14, textAlign: "center" },
   field: { marginTop: 16 },
-  label: { display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6,textAlign: "left" },
+  label: { display: "block", fontWeight: 600, marginBottom: 6,textAlign: "left" },
 
   // 🔥 แก้ให้ input และปุ่มตาอยู่ในกล่องเดียวกัน
   inputWrap: {

@@ -109,22 +109,16 @@ export default function AdminManagement() {
     <div style={{ padding: 20, fontFamily: "Segoe UI, sans-serif", background: "#f9fafb", minHeight: "100vh" }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <button onClick={() => navigate("/")} style={{ padding: "8px 16px", borderRadius: 12, border: "1px solid #d1d5db", background: "#fff", color: "#0f172a", fontWeight: 600 }}>
-          ← กลับหน้าแรก
-        </button>
-
+        <button onClick={() => navigate("/")} style={{ padding: "8px 16px", borderRadius: 12, border: "1px solid #d1d5db", background: "#fff", color: "#0f172a", fontWeight: 600 }}> ← กลับหน้าแรก </button>
+ 
         <h1 style={{ fontSize: 28, fontWeight: 800 }}>📊 Admin Management</h1>
 
-        <button onClick={handleLogout} style={{ background: "#ef4444", color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>
-          🚪 Logout
-        </button>
+        <button onClick={handleLogout} style={{ background: "#ef4444", color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>🚪 Logout</button>
       </div>
 
       {/* Flash Message */}
       {message && (
-        <div style={{ background: "#fef3c7", color: "#92400e", padding: "10px 14px", borderRadius: 8, marginTop: 16 }}>
-          {message}
-        </div>
+        <div style={{ background: "#fef3c7", color: "#92400e", padding: "10px 14px", borderRadius: 8, marginTop: 16 }}> {message}</div>
       )}
 
       {/* Users Table */}
@@ -150,20 +144,14 @@ export default function AdminManagement() {
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u.email}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u.phone || "-"}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
-                      <button
-                        onClick={() => handleDeleteUser(u._id)}
-                        style={{ background: "#ef4444", color: "#fff", border: "none", padding: "6px 12px", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}
-                      >
-                        🗑 Delete
-                      </button>
+                      <button onClick={() => handleDeleteUser(u._id)} 
+                       style={{ background: "#ef4444", color: "#fff", border: "none", padding: "6px 12px", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>🗑 Delete</button>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: "center", color: "#9ca3af", padding: 10 }}>
-                    ไม่มีข้อมูลผู้ใช้
-                  </td>
+                  <td colSpan={5} style={{ textAlign: "center", color: "#9ca3af", padding: 10 }}> ไม่มีข้อมูลผู้ใช้ </td>
                 </tr>
               )}
             </tbody>
@@ -176,30 +164,18 @@ export default function AdminManagement() {
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>📝 Bookings</h2>
 
         {/* ✅ Search Box */}
-        <input
-          type="text"
-          placeholder="🔍 ค้นหา Booking (ชื่อ, วันที่, คอร์ท, สถานะ)"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{
-            marginBottom: 12,
-            padding: "8px 12px",
-            width: "100%",
-            maxWidth: 350,
-            border: "1px solid #d1d5db",
-            borderRadius: 8,
-          }}
-        />
+        <input type="text" placeholder="🔍 ค้นหา Booking (ชื่อ, คอร์ท, สถานะ)" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+          style={{marginBottom: 12,padding: "8px 12px", width: "100%", maxWidth: 350, border: "1px solid #d1d5db", borderRadius: 8, }}/>
 
+        {/* ✅ Search by Date */}
+        <input type="date" onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ padding: "8px 12px", border: "1px solid #d1d5db",borderRadius: 8, }}/>
         <div style={{ overflowX: "auto", background: "#fff", borderRadius: 10, boxShadow: "0 4px 10px rgba(0,0,0,0.05)" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
                 {["ID", "User", "Date", "Court", "Hour", "Status"].map((h) => (
-                  <th key={h} style={{ padding: 12, background: "#10b981", color: "#fff", textAlign: "center", fontWeight: 600 }}>
-                    {h}
-                  </th>
-                ))}
+                <th key={h} style={{ padding: 12, background: "#10b981", color: "#fff", textAlign: "center", fontWeight: 600 }}>{h}</th> ))}
               </tr>
             </thead>
             <tbody>
@@ -212,7 +188,18 @@ export default function AdminManagement() {
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>{b.court}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>{`${b.hour}:00 - ${b.hour + 1}:00`}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>
-                      <span style={{ display: "inline-block", padding: "4px 10px", borderRadius: 12, backgroundColor: "#bfdbfe", color: "#1e3a8a", fontWeight: 600, textAlign: "center", minWidth: 60 }}>
+                      <span style={{ display: "inline-block", padding: "4px 10px", borderRadius: 12, fontWeight: 600, textAlign: "center", minWidth: 60,
+                      backgroundColor:
+                      b.status === "booked" ? "#bfdbfe" : // เขียวอ่อน
+                      b.status === "arrived" ? "#bbf7d0" : // ฟ้าอ่อน
+                      b.status === "canceled" ? "#fecaca" : // แดงอ่อน
+                        "#e5e7eb", // เทา (ค่า default)
+                      color:
+                      b.status === "booked" ? "#1e3a8a" :
+                      b.status === "arrived" ? "#065f46" :
+                      b.status === "canceled" ? "#7f1d1d" :
+                        "#374151",
+                       }}>
                         {b.status === "booked" && "จองแล้ว"}
                         {b.status === "arrived" && "มาแล้ว"}
                         {b.status === "canceled" && "ยกเลิก"}
