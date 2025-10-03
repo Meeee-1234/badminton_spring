@@ -41,6 +41,7 @@ export default function Home() {
   const prevSlide = () => setCurrent((prev) => (prev - 1 + heroImages.length) % heroImages.length);
 
 
+
   return (
     <div style={{ background: "#f3f4f6", minHeight: "100vh" }}>
     <header style={{ position: "sticky", top: 0, zIndex: 50, background: "white", boxShadow: "0 2px 10px rgba(0,0,0,0.08)", }} >
@@ -114,22 +115,42 @@ export default function Home() {
           >
             Game On
           </h1>
-          <Link
-            to="/details"
-            style={{
-              padding: "12px 30px",
-              background: "#10b981",
-              color: "white",
-              borderRadius: "8px",
-              fontWeight: "600",
-              textDecoration: "none",
-              transition: "0.3s",
-            }}
-            onMouseOver={(e) => (e.target.style.background = "#059669")}
-            onMouseOut={(e) => (e.target.style.background = "#10b981")}
-          >
-            จองคอร์ต →
-          </Link>
+          {user ? (
+  <Link
+    to={user.role === "admin" ? "/admin-details" : "/details"}
+    style={{
+      padding: "12px 30px",
+      background: "#10b981",
+      color: "white",
+      borderRadius: "8px",
+      fontWeight: "600",
+      textDecoration: "none",
+      transition: "0.3s",
+    }}
+    onMouseOver={(e) => (e.target.style.background = "#059669")}
+    onMouseOut={(e) => (e.target.style.background = "#10b981")}
+  >
+    จองคอร์ต →
+  </Link>
+) : (
+  <Link
+    to="/login"
+    style={{
+      padding: "12px 30px",
+      background: "#10b981",
+      color: "white",
+      borderRadius: "8px",
+      fontWeight: "600",
+      textDecoration: "none",
+      transition: "0.3s",
+    }}
+    onMouseOver={(e) => (e.target.style.background = "#059669")}
+    onMouseOut={(e) => (e.target.style.background = "#10b981")}
+  >
+    จองคอร์ต →
+  </Link>
+)}
+
         </div>
 
         {/* Slider Controls 56 */}

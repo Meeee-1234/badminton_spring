@@ -190,7 +190,7 @@ export default function Profile() {
             <div
               style={{
                 borderRadius: "16px",
-                border: "1px solid #e5e7eb",
+                border: "2px solid #065f46",
                 background: "white",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                 padding: "24px",
@@ -213,12 +213,14 @@ export default function Profile() {
                 >
                   {user.name?.[0] || "U"}
                 </div>
-                <div>
+                <div style={{ textAlign: "left" }}>
                   <div style={{ fontSize: "20px", fontWeight: "700", color: "#111827" }}>
-                    {user.name}
+                  {user.name}
                   </div>
-                  <div style={{ fontSize: "14px", color: "#6b7280" }}>{user.email}</div>
-                </div>
+                    <div style={{ fontSize: "14px", color: "#6b7280" }}>
+                {user.email}
+                    </div>
+                  </div>
               </div>
 
               <div
@@ -270,7 +272,7 @@ export default function Profile() {
               onSubmit={handleSave}
               style={{
                 borderRadius: "16px",
-                border: "1px solid #e5e7eb",
+                border: "2px solid #065f46",
                 background: "white",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                 padding: "30px",
@@ -384,7 +386,7 @@ export default function Profile() {
               onSubmit={handleSaveEmergency}
               style={{
                 borderRadius: "16px",
-                border: "1px solid #e5e7eb",
+                border: "2px solid #065f46",
                 background: "white",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                 padding: "30px",
@@ -488,7 +490,7 @@ export default function Profile() {
 >
   <h2
     style={{
-      fontSize: "20px",
+      fontSize: "2.2 rem",
       fontWeight: "700",
       color: "#065f46", // เขียวเข้ม
       marginBottom: "16px",
@@ -527,11 +529,6 @@ export default function Profile() {
                 background: index % 2 === 0 ? "#ffffff" : "#f9fafb", // แถวสลับสี
                 transition: "background 0.2s",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "#ecfdf5")} // hover เป็นเขียวอ่อน
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background =
-                  index % 2 === 0 ? "#ffffff" : "#f9fafb")
-              }
             >
               <td style={{ padding: "10px", border: "1px solid #e5e7eb", textAlign: "center", color: "#111827" }}>
                 {b.date}
@@ -558,9 +555,9 @@ export default function Profile() {
                         : "#fee2e2", // แดงอ่อน (ยกเลิก)
                   }}
                 >
-                  {b.status === "booked" && " จองแล้ว"}
-                  {b.status === "arrived" && " มาแล้ว"}
-                  {b.status === "canceled" && " ยกเลิก"}
+                  {b.status === "booked" && "จองแล้ว"}
+                  {b.status === "arrived" && "มาแล้ว"}
+                  {b.status === "canceled" && "ยกเลิก"}
                 </span>
               </td>
             </tr>

@@ -93,6 +93,32 @@ export default function AdminManagement() {
 
   if (loading) return <p>⏳ กำลังโหลด...</p>;
 
+  // ✅ ฟังก์ชันอัปเดตสถานะ booking
+  const updateStatus = async (id, nextStatus) => {
+    const token = localStorage.getItem("auth:token");
+    try {
+      const res = await fetch(`${API}/api/admin/bookings/${id}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "อัปเดตไม่สำเร็จ");
+
+      setBookings((prev) =>
+        prev.map((b) => (b._id === id ? { ...b, status: nextStatus } : b))
+      );
+      alert("✅ อัปเดตสำเร็จ");
+    } catch (err) {
+      console.error("❌ Update error:", err);
+      alert("❌ " + err.message);
+    }
+  };
+
   return (
     <div style={{ padding: 20, fontFamily: "Segoe UI, sans-serif", background: "#f9fafb", minHeight: "100vh" }}>
       {/* Header */}
@@ -189,6 +215,24 @@ export default function AdminManagement() {
                         {b.status === "canceled" && "ยกเลิก"}
                         {!b.status && "-"}
                       </span>
+
+                      {/* ปุ่มเปลี่ยนสถานะ */}
+                      <div style={{ marginTop: 6, display: "flex", gap: 6, justifyContent: "center" }}>
+                        <button
+                          onClick={() => updateStatus(b._id, "arrived")}
+                          disabled={b.status === "arrived"}
+                          style={{ background: "#dcfce7", border: "1px solid #16a34a", padding: "4px 8px", borderRadius: 6, cursor: "pointer" }}
+                        >
+                          ✓ มาแล้ว
+                        </button>
+                        <button
+                          onClick={() => updateStatus(b._id, "canceled")}
+                          disabled={b.status === "canceled"}
+                          style={{ background: "#fee2e2", border: "1px solid #ef4444", padding: "4px 8px", borderRadius: 6, cursor: "pointer" }}
+                        >
+                          × ยกเลิก
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
