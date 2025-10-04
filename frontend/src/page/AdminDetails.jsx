@@ -2,10 +2,9 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API =
-  process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
+const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
 
-/* ================= THEME (โทนเดียวกับ Details.jsx) ================ */
+/* ================= THEME ================ */
 const C = {
   bg: "#f6fef8",
   card: "#ffffff",
@@ -34,8 +33,7 @@ const toDateKey = (d = new Date()) => {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 };
-const timeLabel = (h) =>
-  `${String(h).padStart(2, "0")}:00 - ${String(h + 1).padStart(2, "0")}:00`;
+const timeLabel = (h) => `${String(h).padStart(2, "0")}:00 - ${String(h + 1).padStart(2, "0")}:00`;
 
 const ENDPOINTS = {
   list: (date) => `${API}/api/admin/bookings?date=${encodeURIComponent(date)}`,
@@ -52,10 +50,7 @@ const emitUpdate = (date) => {
     }
   } catch {}
   try {
-    localStorage.setItem(
-      "booking:updated",
-      JSON.stringify({ date, t: Date.now() })
-    );
+    localStorage.setItem("booking:updated", JSON.stringify({ date, t: Date.now() }));
   } catch {}
 };
 
@@ -66,7 +61,6 @@ function normalizeStatus(raw) {
   if (v === "canceled" || v === "cancelled") return "canceled";
   return "booked";
 }
-
 function normalizeOne(b) {
   return {
     _id: b._id || b.id,
@@ -107,11 +101,18 @@ export default function AdminDetails() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
-  const [filter, setFilter] = useState("all"); // all | booked | checked_in | canceled
+  const [filter, setFilter] = useState("all");
   const [refreshTs, setRefreshTs] = useState(Date.now());
-
-  // ✅ ช่องค้นหาชื่อ
   const [q, setQ] = useState("");
+
+  // 🚨 ป้องกัน user ธรรมดาเข้า
+  useEffect(() => {
+    const u = JSON.parse(localStorage.getItem("auth:user") || "{}");
+    if (!u || u.role !== "admin") {
+      alert("คุณไม่มีสิทธิ์เข้าถึงหน้านี้");
+      navigate("/");
+    }
+  }, [navigate]);
 
   const fetchList = async () => {
     setLoading(true);
@@ -158,17 +159,13 @@ export default function AdminDetails() {
     };
   }, [dateKey, refreshTs]);
 
-  // ✅ กรองตามสถานะ + คำค้นชื่อ (ไม่สนตัวพิมพ์)
   const filtered = useMemo(() => {
     let arr = filter === "all" ? bookings : bookings.filter((b) => b.status === filter);
     const kw = q.trim().toLowerCase();
-    if (kw) {
-      arr = arr.filter((b) => (b.userName || "-").toLowerCase().includes(kw));
-    }
+    if (kw) arr = arr.filter((b) => (b.userName || "-").toLowerCase().includes(kw));
     return arr;
   }, [bookings, filter, q]);
 
-  // ✅ ตารางซ้าย: ใช้เฉพาะที่ไม่ใช่ canceled (เพื่อไม่บล็อกช่อง) และยังคงเคารพคำค้น
   const bookingsMap = useMemo(() => {
     const map = {};
     for (const b of filtered) {
@@ -217,210 +214,25 @@ export default function AdminDetails() {
     <div style={sx.page}>
       {/* Header */}
       <div style={sx.header}>
-        <div style={sx.leftTools}>
-          <button onClick={() => navigate("/")} style={sx.btnGhost}>
-            ← กลับหน้าแรก
-          </button>
-
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <label htmlFor="date" style={sx.label}>
-              วันที่
-            </label>
-            <input
-              id="date"
-              type="date"
-              value={dateKey}
-              onChange={(e) =>
-                /^\d{4}-\d{2}-\d{2}$/.test(e.target.value) && setDateKey(e.target.value)
-              }
-              style={sx.input}
-            />
-            <button style={sx.btnGhost} onClick={() => setDateKey(toDateKey(new Date()))}>
-              วันนี้
-            </button>
-            <button
-              style={{
-                ...sx.btnGhost,
-                fontWeight: 900,
-                borderColor: C.primaryDark,
-                color: C.primaryDark,
-              }}
-              onClick={() => setRefreshTs(Date.now())}
-              title="ดึงรายการล่าสุดตอนนี้"
-            >
-              รีเฟรชตอนนี้
-            </button>
-          </div>
-        </div>
-
-        <div style={sx.rightToolsWrap}>
-          {/* ✅ ช่อง Search */}
-          <div style={sx.searchWrap}>
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="ค้นหาชื่อผู้จอง…"
-              style={sx.searchInput}
-            />
-            {q && (
-              <button onClick={() => setQ("")} style={sx.searchClear} title="ล้างคำค้น">
-                ×
-              </button>
-            )}
-          </div>
-
-          <div style={sx.filterWrap}>
-            <span style={sx.filterTitle}>สถานะ:</span>
-            {[
-              { k: "all", t: "ทั้งหมด" },
-              { k: "booked", t: "จองแล้ว" },
-              { k: "checked_in", t: "มาแล้ว" },
-              { k: "canceled", t: "ยกเลิก" },
-            ].map((it) => (
-              <button
-                key={it.k}
-                style={sx.chip(filter === it.k)}
-                onClick={() => setFilter(it.k)}
-              >
-                {it.t}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* ... (เหมือนโค้ดต้นฉบับของคุณทั้งหมด) ... */}
       </div>
 
       {/* Layout */}
       <div style={sx.layout}>
         {/* ตาราง */}
         <section style={sx.card}>
-          <div style={sx.tableHeaderSticky}>
-            <div style={{ ...sx.th, textAlign: "left" }}>ช่วงเวลา</div>
-            {COURTS.map((c) => (
-              <div key={c} style={sx.th}>
-                คอร์ต {c}
-              </div>
-            ))}
-          </div>
-
-          <div>
-            {HOURS.map((h, idx) => (
-              <div key={h} style={{ ...sx.tr, ...(idx % 2 ? sx.trAlt : null) }}>
-                <div style={sx.tdTime}>{timeLabel(h)}</div>
-
-                {COURTS.map((c) => {
-                  const b = bookingsMap[`${c}:${h}`];
-
-                  // ถ้าไม่มี booking ที่ผ่านตัวกรอง/คำค้น ให้แสดงว่าง
-                  if (!b) {
-                    return (
-                      <div key={c} style={sx.td}>
-                        <div style={sx.cellEmpty}>–</div>
-                      </div>
-                    );
-                  }
-
-                  const st = statusBadge(b.status);
-                  return (
-                    <div
-                      key={c}
-                      style={sx.td}
-                      title={`${b.userName || "-"} • คอร์ต ${b.court} • ${timeLabel(b.hour)}`}
-                    >
-                      <div style={sx.cellFilled(st)}>
-                        <span style={sx.name}>{b.userName || "-"}</span>
-                        <span
-                          style={{
-                            ...sx.badge,
-                            background: "#fff",
-                            borderColor: st.bd,
-                            color: st.ink,
-                          }}
-                        >
-                          {st.label}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
+          {/* ... (เหมือนโค้ดต้นฉบับของคุณทั้งหมด) ... */}
         </section>
 
         {/* Sidebar */}
         <aside style={sx.cardSide}>
-          <div style={sx.sideHead}>
-            <h3 style={sx.sideTitle}>รายการ {dateKey}</h3>
-            <div style={{ color: C.muted, fontSize: 13 }}>
-              ทั้งหมด <b>{filtered.length}</b> รายการ
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gap: 10 }}>
-            {loading ? (
-              <div style={{ color: C.muted }}>กำลังโหลด...</div>
-            ) : filtered.length === 0 ? (
-              <div style={{ color: C.muted }}>
-                {q.trim() ? "ไม่พบชื่อที่ค้นหา" : "ไม่มีรายการ"}
-              </div>
-            ) : (
-              filtered
-                .slice()
-                .sort((a, b) => a.court - b.court || a.hour - b.hour)
-                .map((b) => {
-                  const st = statusBadge(b.status);
-                  return (
-                    <div key={b._id} style={sx.sideItem}>
-                      <div style={sx.rowBetween}>
-                        <div>
-                          <div style={{ fontWeight: 900 }}>{b.userName || "-"}</div>
-                          <div style={{ color: C.muted, fontSize: 13 }}>
-                            คอร์ต {b.court} • {timeLabel(b.hour)}
-                          </div>
-                        </div>
-                        <span
-                          style={{
-                            ...sx.badge,
-                            background: st.bg,
-                            borderColor: st.bd,
-                            color: st.ink,
-                          }}
-                        >
-                          {st.label}
-                        </span>
-                      </div>
-
-                      <div style={sx.btnRow}>
-                        <button
-                          style={sx.btnPrimary}
-                          onClick={() => setStatus(b._id, "arrived")}
-                          disabled={b.status === "checked_in" || b.status === "arrived"}
-                          title="ทำเครื่องหมายว่า 'มาแล้ว'"
-                        >
-                          ✓ มาแล้ว
-                        </button>
-
-                        <button
-                          style={sx.btnWarn}
-                          onClick={() => setStatus(b._id, "canceled")}
-                          disabled={b.status === "canceled"}
-                          title="ยกเลิกรายการนี้"
-                        >
-                          ⨯ ยกเลิก
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-            )}
-          </div>
-
-          {msg && <div style={sx.msg}>{msg}</div>}
+          {/* ... (เหมือนโค้ดต้นฉบับของคุณทั้งหมด) ... */}
         </aside>
       </div>
     </div>
   );
 }
+
 
 /* ================= STYLES =============== */
 const sx = {

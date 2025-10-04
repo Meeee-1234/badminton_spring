@@ -195,9 +195,15 @@ export default function Profile() {
 
                 <div>
                   <label style={{ display: "block", fontSize: "20px", fontWeight: "bold",marginBottom: "6px", textAlign: "left" }}> Phone </label>
-                  <input type="tel" name="phone" value={editForm.phone} 
-                         onChange={handleChange} 
-                         style={{ width: "100%",  borderRadius: "8px",  border: "1px solid #6ee7b7", padding: "10px", outline: "none", fontSize: "16px", }} />
+                  <input type="tel" name="phone" value={editForm.phone}
+                         onChange={(e) => {
+                          const onlyNums = e.target.value.replace(/\D/g, ""); 
+                          if (onlyNums.length <= 10) {
+                            setEditForm({ ...editForm, phone: onlyNums });
+                          }
+                         }}
+                         maxLength={10}
+                         style={{ width: "100%", borderRadius: "8px", border: "1px solid #6ee7b7", padding: "10px", outline: "none", fontSize: "16px", }} />
                 </div>
               </div>
 
@@ -227,9 +233,15 @@ export default function Profile() {
 
                 <div>
                   <label style={{ display: "block", fontSize: "20px", marginBottom: "6px",  textAlign: "left", fontWeight:"bold"  }}> Phone </label>
-                  <input type="tel" name="emergencyPhone" value={emergencyForm.emergencyPhone}
-                         onChange={handleEmergencyChange}
-                         style={{  width: "100%", borderRadius: "8px", border: "1px solid #6ee7b7", padding: "10px", outline: "none", fontSize: "16px", }}/>
+                   <input type="tel" name="emergencyPhone" value={emergencyForm.emergencyPhone}
+                          onChange={(e) => {
+                          const onlyNums = e.target.value.replace(/\D/g, ""); 
+                          if (onlyNums.length <= 10) {
+                            setEmergencyForm({ ...emergencyForm, emergencyPhone: onlyNums });
+                          }
+                        }}
+                        maxLength={10}
+                        style={{ width: "100%", borderRadius: "8px", border: "1px solid #6ee7b7", padding: "10px", outline: "none", fontSize: "16px", }} />
                 </div>
               </div>
 

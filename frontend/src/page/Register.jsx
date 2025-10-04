@@ -21,6 +21,11 @@ export default function Register() {
     e.preventDefault();
     setMessage("");
 
+    if (form.phone.length !== 10) {
+      setMessage("กรุณากรอกเบอร์โทรให้ครบ 10 หลัก");
+      return;
+    }
+
     if (form.password !== form.confirmPassword) {
       setMessage("รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน");
       return;
@@ -81,10 +86,19 @@ export default function Register() {
           <div style={ui.field}>
             <label htmlFor="phone" style={ui.label}>Phone</label>
             <div style={ui.inputWrap}>
-              <input id="phone" type="text" name="phone" style={ui.input}
-                     value={form.phone} onChange={handleChange} required/>
+              <input id="phone" type="tel" name="phone"
+                     style={ui.input} value={form.phone} 
+                     onChange={(e) => {
+                      // ✅ เอาเฉพาะตัวเลข และจำกัดไม่เกิน 10 หลัก
+                      const onlyNums = e.target.value.replace(/\D/g, "");
+                      if (onlyNums.length <= 10) {
+                        setForm({ ...form, phone: onlyNums });
+                      }
+                    }}
+                    maxLength={10} required/>
             </div>
           </div>
+
 
           <div style={ui.field}>
             <label htmlFor="password" style={ui.label}>Password  <span style={ui.note}>อย่างน้อย 6 ตัวอักษร</span></label>
