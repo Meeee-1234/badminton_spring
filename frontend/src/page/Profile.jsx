@@ -133,7 +133,7 @@ export default function Profile() {
         </div>
       </section>
 
-      <section style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 20px 60px", }} >
+      <section style={{ maxWidth: "1200px", margin: "0 auto", }} >
         <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "24px", }} >
           <aside>
             <div style={{ borderRadius: "16px", border: "1px solid #6ee7b7", background: "white", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", padding: "24px", }} >
@@ -179,7 +179,7 @@ export default function Profile() {
                 Edit Information
               </h2><br/>
 
-              <div style={{ display: "grid", gap: "20px" }}>
+              <div style={{ display: "grid", gap: "20px", paddingRight: "20px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "20px", fontWeight: "bold", marginBottom: "6px", textAlign: "left" }}> Username </label>
                   <input type="text" name="name" value={editForm.name} 
@@ -223,7 +223,7 @@ export default function Profile() {
                 Emergency Contact
               </h2><br/>
 
-              <div style={{ display: "grid", gap: "20px" }}>
+              <div style={{ display: "grid", gap: "20px", paddingRight: "20px" }}>
                 <div> 
                   <label style={{ display: "block", fontSize: "20px", marginBottom: "6px", textAlign: "left", fontWeight:"bold" }}> Name </label>
                   <input type="text" name="emergencyName" value={emergencyForm.emergencyName} 
@@ -254,10 +254,10 @@ export default function Profile() {
             </form>
           </main>
         </div>
-      </section>
+      </section><br/>
 
       {/* Booking History */}
-      <section style={{ marginTop: "32px", borderRadius: "16px", border: "1px solid #6ee7b7", background: "white", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", padding: "24px",}} >
+      <section style={{ maxWidth: "1150px", margin: "0 auto", borderRadius: "16px", border: "1px solid #6ee7b7", background: "white", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", padding: "24px",}} >
         <h2 style={{ fontSize: "30px", fontWeight: "700",color: "#065f46", marginBottom: "16px", }}> 
           ประวัติการจองสนาม 
         </h2><br/>

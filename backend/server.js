@@ -275,7 +275,7 @@ app.post("/api/auth/login", async (req, res) => {
     );
 
     const { password: _, ...safeUser } = user.toObject();
-    res.json({ message: "เข้าสู่ระบบสำเร็จ", token, user: safeUser });
+    res.json({ message: "เข้าสู่ระบบสำเร็จ", token, user:{ ...safeUser, role: user.role }});
   } catch (err) {
     console.error("❌ Login error:", err.message);
     res.status(500).json({ error: "Server error", detail: err.message });
