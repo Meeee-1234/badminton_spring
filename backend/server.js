@@ -145,6 +145,22 @@ app.get("/api/admin/users", isAdmin, async (req, res) => {
 });
 
 
+function requireAdmin(req, res, next) {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "Unauthorized" });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== "admin") {
+      return res.status(403).json({ error: "Forbidden: Admin only" });
+    }
+    req.user = decoded;
+    next();
+  } catch (err) {
+    res.status(401).json({ error: "Invalid token" });
+  }
+}
+
 app.get("/api/admin/bookings", isAdmin, async (req, res) => {
   try {
     const bookings = await Booking.find().populate("user", "name email");
@@ -275,7 +291,7 @@ app.post("/api/auth/login", async (req, res) => {
     );
 
     const { password: _, ...safeUser } = user.toObject();
-    res.json({ message: "เข้าสู่ระบบสำเร็จ", token, user:{ ...safeUser, role: user.role }});
+    res.json({ message: "เข้าสู่ระบบสำเร็จ", token, user: safeUser });
   } catch (err) {
     console.error("❌ Login error:", err.message);
     res.status(500).json({ error: "Server error", detail: err.message });
@@ -564,6 +580,7 @@ app.get("/api/bookings/user/:userId", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
 
 
 // ---------- Start Server ----------
