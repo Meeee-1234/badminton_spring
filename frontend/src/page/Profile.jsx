@@ -281,14 +281,23 @@ export default function Profile() {
                   <td style={{ padding: "10px", border: "1px solid #e5e7eb", textAlign: "center", color: "#111827" }}> คอร์ต {b.court} </td>
                   <td style={{ padding: "10px", border: "1px solid #e5e7eb", textAlign: "center", color: "#111827" }}>{b.hour}:00 - {b.hour + 1}:00</td>
                   <td style={{ padding: "10px", border: "1px solid #e5e7eb", textAlign: "center" }}>
-                    <span style={{ display: "inline-block", padding: "4px 10px", borderRadius: "12px", fontWeight: "600", color: "#064e3b", 
-                                   background: b.status === "booked" ? "#d1fae5" 
-                                             : b.status === "arrived" ? "#bbf7d0"
-                                             : "#fee2e2", }}>
-                      {b.status === "booked" && "จองแล้ว"}
-                      {b.status === "arrived" && "มาแล้ว"}
-                      {b.status === "canceled" && "ยกเลิก"}
-                    </span>
+                      <span style={{ display: "inline-block", padding: "4px 10px", borderRadius: 12, fontWeight: 600, textAlign: "center", minWidth: 60,
+                      backgroundColor:
+                      b.status === "booked" ? "#bfdbfe" : // เขียวอ่อน
+                      b.status === "arrived" ? "#bbf7d0" : // ฟ้าอ่อน
+                      b.status === "canceled" ? "#fecaca" : // แดงอ่อน
+                        "#e5e7eb", // เทา (ค่า default)
+                      color:
+                      b.status === "booked" ? "#1e3a8a" :
+                      b.status === "arrived" ? "#065f46" :
+                      b.status === "canceled" ? "#7f1d1d" :
+                        "#374151",
+                       }}>
+                        {b.status === "booked" && "จองแล้ว"}
+                        {b.status === "arrived" && "มาแล้ว"}
+                        {b.status === "canceled" && "ยกเลิก"}
+                        {!b.status && "-"}
+                      </span>
                   </td>
                 </tr>
               ))}
