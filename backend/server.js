@@ -1,18 +1,18 @@
-// server.js (CommonJS)
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken"); // Admin....
-require("dotenv").config();
+
+const express = require("express"); // Framework สร้าง REST API
+const mongoose = require("mongoose"); // เชื่อมต่อและจัดการ MongoDB
+const cors = require("cors"); // อนุญาตให้ frontend (React) เรียก API ได้
+const bcrypt = require("bcrypt"); // Hash password
+const jwt = require("jsonwebtoken"); // ใช้สร้าง token สำหรับ Auth
+require("dotenv").config(); // โหลดค่าจาก .env -> MONGODB_URI, JWT_SECRET
 
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+
 // ---------- CORS ----------
 app.use(
-  
   cors({
     origin: [
       "http://localhost:3000",
@@ -25,6 +25,7 @@ app.use(
 );
 
 app.use(express.json());
+
 
 // ---------- Connect MongoDB ----------
 mongoose
@@ -50,6 +51,19 @@ const userSchema = new mongoose.Schema(
 );
 
 const User = mongoose.model("User", userSchema);
+
+
+// ---------- Profile Schema ----------
+const profileSchema = new mongoose.Schema(
+  {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
+    emergencyName: { type: String, default: "" },  
+    emergencyPhone: { type: String, default: "" },  
+  },
+  { timestamps: true, collection: "profiles" }
+);
+
+const Profile = mongoose.model("Profile", profileSchema);
 
 
 // ---------- Booking Schema ----------
@@ -89,6 +103,7 @@ async function createAdmin() {
 }
 createAdmin();
 
+
 // ---------- Middleware ----------
 function isAdmin(req, res, next) {
   try {
@@ -127,6 +142,7 @@ function authRequired(req, res, next) {
   }
 }
 
+
 // ---------- Admin Routes ----------
 app.get("/api/admin/users", isAdmin, async (req, res) => {
   try {
@@ -145,6 +161,7 @@ app.get("/api/admin/users", isAdmin, async (req, res) => {
 });
 
 
+// ---------- ได้ใช้มั้ยหนิ ทำไมมันเป็นสีนี้ ----------
 function requireAdmin(req, res, next) {
   try {
     const token = req.headers.authorization?.split(" ")[1];
@@ -161,6 +178,7 @@ function requireAdmin(req, res, next) {
   }
 }
 
+
 app.get("/api/admin/bookings", isAdmin, async (req, res) => {
   try {
     const bookings = await Booking.find().populate("user", "name email");
@@ -170,7 +188,6 @@ app.get("/api/admin/bookings", isAdmin, async (req, res) => {
       date: b.date,
       court: b.court,
       hour: b.hour,
-      // status: "booked"
       status: b.status,
       createdAt: new Date(b.createdAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }),
       updatedAt: new Date(b.updatedAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })
@@ -180,6 +197,7 @@ app.get("/api/admin/bookings", isAdmin, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch bookings" });
   }
 });
+
 
 // ✏️ Soft Delete User (Admin only)
 app.delete("/api/admin/users/:id", isAdmin, async (req, res) => {
@@ -212,6 +230,53 @@ app.delete("/api/admin/users/:id", isAdmin, async (req, res) => {
   }
 });
 
+
+// ✅ Update booking status (Admin only)
+app.put("/api/admin/bookings/:id/status", isAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!["booked", "arrived", "canceled"].includes(status)) {
+      return res.status(400).json({ error: "สถานะไม่ถูกต้อง" });
+    }
+
+    const booking = await Booking.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true }
+    ).populate("user", "name email");
+
+    if (!booking) {
+      return res.status(404).json({ error: "ไม่พบการจอง" });
+    }
+
+    res.json({ message: "อัพเดตสถานะเรียบร้อย", booking });
+  } catch (err) {
+    console.error("❌ Update booking status error:", err.message);
+    res.status(500).json({ error: "Server error" });
+ }
+});
+
+
+// ✅ ดึงการจองทั้งหมดของ user
+app.get("/api/bookings/user/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: "ID ไม่ถูกต้อง" });
+    }
+
+    const bookings = await Booking.find({ user: userId })
+      .sort({ date: -1, hour: 1 }); // เรียงวันที่ล่าสุดก่อน
+
+    res.json({ bookings });
+  } catch (err) {
+    console.error("❌ User bookings error:", err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 
 // ---------- Routes ----------
@@ -322,8 +387,9 @@ app.get("/api/users/:id", async (req, res) => {
   }
 });
 
+
 // ✏️ Update user by id
-app.put("/api/users/:id", async (req, res) => {
+app.patch("/api/users/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { name, phone } = req.body;
@@ -350,23 +416,7 @@ app.put("/api/users/:id", async (req, res) => {
 });
 
 
-// ---------- Profile Schema ----------
-const profileSchema = new mongoose.Schema(
-  {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
-    emergencyName: { type: String, default: "" },   // ชื่อผู้ติดต่อฉุกเฉิน
-    emergencyPhone: { type: String, default: "" },  // เบอร์โทรฉุกเฉิน
-  },
-  { timestamps: true, collection: "profiles" }
-);
-
-const Profile = mongoose.model("Profile", profileSchema);
-
-
-
-
 // ---------- Booking Routes ----------
-
 // ✅ ดูช่วงเวลาที่ถูกจองแล้ว (เฉพาะที่ยัง active)
 // ✅ ดูช่วงเวลาที่ถูกจองแล้ว (เฉพาะวันนั้น และไม่รวม canceled)
 app.get("/api/bookings/taken", async (req, res) => {
@@ -407,8 +457,6 @@ app.get("/api/bookings/taken", async (req, res) => {
 });
 
 
-
-
 // ✅ จองสนามใหม่ (ต้อง login)
 app.post("/api/bookings", authRequired, async (req, res) => {
   try {
@@ -420,16 +468,15 @@ app.post("/api/bookings", authRequired, async (req, res) => {
     }
 
     // ✅ แก้เป็นแบบนี้
-const exists = await Booking.findOne({ 
-  date, 
-  court, 
-  hour, 
-  status: { $in: ["booked", "arrived"] }   // นับแค่ที่ยัง active
-});
-if (exists) {
-  return res.status(409).json({ error: "ช่วงเวลานี้ถูกจองแล้ว" });
-}
-
+    const exists = await Booking.findOne({ 
+      date, 
+      court, 
+      hour, 
+      status: { $in: ["booked", "arrived"] }   // นับแค่ที่ยัง active
+    });
+    if (exists) {
+      return res.status(409).json({ error: "ช่วงเวลานี้ถูกจองแล้ว" });
+    }
 
     const booking = await Booking.create({
       user: userId,
@@ -446,7 +493,7 @@ if (exists) {
   }
 });
 
-// ✅ ดูการจองของ user ตามวัน
+
 // ✅ ดูการจองของ user ตามวัน (ไม่เอาที่ถูกยกเลิก)
 // GET /api/bookings/my/:userId/:date
 app.get("/api/bookings/my/:userId/:date", async (req, res) => {
@@ -489,8 +536,6 @@ app.get("/api/bookings/my/:userId/:date", async (req, res) => {
 });
 
 
-
-
 // POST หรือ PUT profile
 app.post("/api/profile/:userId", async (req, res) => {
   try {
@@ -509,6 +554,7 @@ app.post("/api/profile/:userId", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
 
 app.get("/api/profile/:userId", async (req, res) => {
   try {
@@ -531,56 +577,6 @@ app.get("/api/profile/:userId", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
-
-
-// ✅ Update booking status (Admin only)
-app.put("/api/admin/bookings/:id/status", isAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    if (!["booked", "arrived", "canceled"].includes(status)) {
-      return res.status(400).json({ error: "สถานะไม่ถูกต้อง" });
-    }
-
-    const booking = await Booking.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true }
-    ).populate("user", "name email");
-
-    if (!booking) {
-      return res.status(404).json({ error: "ไม่พบการจอง" });
-    }
-
-    res.json({ message: "อัพเดตสถานะเรียบร้อย", booking });
-  } catch (err) {
-    console.error("❌ Update booking status error:", err.message);
-    res.status(500).json({ error: "Server error" });
- }
-});
-
-
-
-// ✅ ดึงการจองทั้งหมดของ user
-app.get("/api/bookings/user/:userId", async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ error: "ID ไม่ถูกต้อง" });
-    }
-
-    const bookings = await Booking.find({ user: userId })
-      .sort({ date: -1, hour: 1 }); // เรียงวันที่ล่าสุดก่อน
-
-    res.json({ bookings });
-  } catch (err) {
-    console.error("❌ User bookings error:", err.message);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
 
 
 // ---------- Start Server ----------

@@ -1,4 +1,4 @@
-// src/page/AdminDetails.jsx
+
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -99,7 +99,6 @@ function statusBadge(status) {
   }
 }
 
-
 /* ================ MAIN ================= */
 export default function AdminDetails() {
 
@@ -122,8 +121,6 @@ export default function AdminDetails() {
       navigate("/");
     }
   }, [navigate]);
-
-
 
   const fetchList = async () => {
     setLoading(true);
@@ -228,7 +225,6 @@ export default function AdminDetails() {
 
   return (
     <div style={sx.page}>
-      {/* Header */}
       <div style={sx.header}>
         <div style={sx.leftTools}>
           <button onClick={() => navigate("/")} style={sx.btnGhost}>
@@ -239,46 +235,24 @@ export default function AdminDetails() {
             <label htmlFor="date" style={sx.label}>
               วันที่
             </label>
-            <input
-              id="date"
-              type="date"
-              value={dateKey}
-              onChange={(e) =>
-                /^\d{4}-\d{2}-\d{2}$/.test(e.target.value) && setDateKey(e.target.value)
-              }
-              style={sx.input}
-            />
+            <input id="date" type="date" value={dateKey} style={sx.input}
+                   onChange={(e) => /^\d{4}-\d{2}-\d{2}$/.test(e.target.value) && setDateKey(e.target.value) } />
             <button style={sx.btnGhost} onClick={() => setDateKey(toDateKey(new Date()))}>
               วันนี้
             </button>
-            <button
-              style={{
-                ...sx.btnGhost,
-                fontWeight: 900,
-                borderColor: C.primaryDark,
-                color: C.primaryDark,
-              }}
-              onClick={() => setRefreshTs(Date.now())}
-              title="ดึงรายการล่าสุดตอนนี้"
-            >
+            <button style={{ ...sx.btnGhost, fontWeight: 900, borderColor: C.primaryDark, color: C.primaryDark, }}
+                    onClick={() => setRefreshTs(Date.now())} title="ดึงรายการล่าสุดตอนนี้" >
               รีเฟรชตอนนี้
             </button>
           </div>
         </div>
 
+        {/* Search */}
         <div style={sx.rightToolsWrap}>
-          {/* ✅ ช่อง Search */}
           <div style={sx.searchWrap}>
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="ค้นหาชื่อผู้จอง…"
-              style={sx.searchInput}
-            />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหาชื่อผู้จอง…" style={sx.searchInput} />
             {q && (
-              <button onClick={() => setQ("")} style={sx.searchClear} title="ล้างคำค้น">
-                ×
-              </button>
+              <button onClick={() => setQ("")} style={sx.searchClear} title="ล้างคำค้น"> × </button>
             )}
           </div>
 
@@ -290,8 +264,8 @@ export default function AdminDetails() {
               { k: "checked_in", t: "มาแล้ว" },
               { k: "canceled", t: "ยกเลิก" },
             ].map((it) => (
-              <button
-                key={it.k}
+              <button 
+              key={it.k}
                 style={sx.chip(filter === it.k)}
                 onClick={() => setFilter(it.k)}
               >
@@ -302,9 +276,8 @@ export default function AdminDetails() {
         </div>
       </div>
 
-      {/* Layout */}
+      {/* ตาราง */}
       <div style={sx.layout}>
-        {/* ตาราง */}
         <section style={sx.card}>
           <div style={sx.tableHeaderSticky}>
             <div style={{ ...sx.th, textAlign: "left" }}>ช่วงเวลา</div>
@@ -319,11 +292,8 @@ export default function AdminDetails() {
             {HOURS.map((h, idx) => (
               <div key={h} style={{ ...sx.tr, ...(idx % 2 ? sx.trAlt : null) }}>
                 <div style={sx.tdTime}>{timeLabel(h)}</div>
-
                 {COURTS.map((c) => {
                   const b = bookingsMap[`${c}:${h}`];
-
-                  // ถ้าไม่มี booking ที่ผ่านตัวกรอง/คำค้น ให้แสดงว่าง
                   if (!b) {
                     return (
                       <div key={c} style={sx.td}>
@@ -408,8 +378,7 @@ export default function AdminDetails() {
                           style={sx.btnPrimary}
                           onClick={() => setStatus(b._id, "arrived")}
                           disabled={b.status === "checked_in" || b.status === "arrived"}
-                          title="ทำเครื่องหมายว่า 'มาแล้ว'"
-                        >
+                          title="ทำเครื่องหมายว่า 'มาแล้ว'" >
                           ✓ มาแล้ว
                         </button>
 
@@ -417,8 +386,7 @@ export default function AdminDetails() {
                           style={sx.btnWarn}
                           onClick={() => setStatus(b._id, "canceled")}
                           disabled={b.status === "canceled"}
-                          title="ยกเลิกรายการนี้"
-                        >
+                          title="ยกเลิกรายการนี้" >
                           ⨯ ยกเลิก
                         </button>
                       </div>

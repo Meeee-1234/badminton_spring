@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -11,14 +12,12 @@ export default function AdminManagement() {
   const [searchTerm, setSearchTerm] = useState(""); 
   const navigate = useNavigate();
 
-  // ✅ Logout
   const handleLogout = () => {
     localStorage.removeItem("auth:token");
     localStorage.removeItem("auth:user");
     navigate("/login");
   };
 
-  // ✅ Delete User
   const handleDeleteUser = async (id) => {
     if (!window.confirm("คุณแน่ใจหรือไม่ที่จะลบผู้ใช้นี้?")) return;
 
@@ -107,12 +106,10 @@ export default function AdminManagement() {
 
   return (
     <div style={{ padding: 20, fontFamily: "Segoe UI, sans-serif", background: "#f9fafb", minHeight: "100vh" }}>
-      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <button onClick={() => navigate("/")} style={{ padding: "8px 16px", borderRadius: 12, border: "1px solid #d1d5db", background: "#fff", color: "#0f172a", fontWeight: 600 }}> ← กลับหน้าแรก </button>
  
         <h1 style={{ fontSize: 28, fontWeight: 800 }}>📊 Admin Management</h1>
-
         <button onClick={handleLogout} style={{ background: "#ef4444", color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>🚪 Logout</button>
       </div>
 
@@ -121,7 +118,7 @@ export default function AdminManagement() {
         <div style={{ background: "#fef3c7", color: "#92400e", padding: "10px 14px", borderRadius: 8, marginTop: 16 }}> {message}</div>
       )}
 
-      {/* Users Table */}
+      {/* Users */}
       <section style={{ marginBottom: 40 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>👤 Users</h2>
         <div style={{ overflowX: "auto", background: "#fff", borderRadius: 10, boxShadow: "0 4px 10px rgba(0,0,0,0.05)" }}>
@@ -159,15 +156,15 @@ export default function AdminManagement() {
         </div>
       </section>
 
-      {/* Bookings Table */}
+      {/* Bookings */}
       <section style={{ marginBottom: 40 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>📝 Bookings</h2>
 
-        {/* ✅ Search Box */}
+        {/* Search */}
         <input type="text" placeholder="🔍 ค้นหา Booking (ชื่อ, คอร์ท, สถานะ)" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
           style={{marginBottom: 12,padding: "8px 12px", width: "100%", maxWidth: 350, border: "1px solid #d1d5db", borderRadius: 8, }}/>
 
-        {/* ✅ Search by Date */}
+        {/* Search by Date */}
         <input type="date" onChange={(e) => setSearchTerm(e.target.value)}
           style={{ padding: "8px 12px", border: "1px solid #d1d5db",borderRadius: 8, }}/>
         <div style={{ overflowX: "auto", background: "#fff", borderRadius: 10, boxShadow: "0 4px 10px rgba(0,0,0,0.05)" }}>
@@ -190,9 +187,9 @@ export default function AdminManagement() {
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>
                       <span style={{ display: "inline-block", padding: "4px 10px", borderRadius: 12, fontWeight: 600, textAlign: "center", minWidth: 60,
                       backgroundColor:
-                      b.status === "booked" ? "#bfdbfe" : // เขียวอ่อน
-                      b.status === "arrived" ? "#bbf7d0" : // ฟ้าอ่อน
-                      b.status === "canceled" ? "#fecaca" : // แดงอ่อน
+                      b.status === "booked" ? "#bfdbfe" : 
+                      b.status === "arrived" ? "#bbf7d0" : 
+                      b.status === "canceled" ? "#fecaca" :
                         "#e5e7eb", // เทา (ค่า default)
                       color:
                       b.status === "booked" ? "#1e3a8a" :
