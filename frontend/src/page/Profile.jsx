@@ -14,11 +14,7 @@ export default function Profile() {
   const [userId, setUserId] = useState(null);
   const [emergencyMessage, setEmergencyMessage] = useState("");
   const [bookings, setBookings] = useState([]);
-
-  const [emergencyForm, setEmergencyForm] = useState({
-    emergencyName: "",
-    emergencyPhone: "",
-  });
+  const [emergencyForm, setEmergencyForm] = useState({ emergencyName: "", emergencyPhone: "", });
 
   useEffect(() => {
     const u = JSON.parse(localStorage.getItem("auth:user") || "{}");
@@ -59,7 +55,7 @@ export default function Profile() {
 
     try {
       const res = await fetch(`${API}/api/users/${userId}`, {
-        method: "PUT",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: editForm.name,
