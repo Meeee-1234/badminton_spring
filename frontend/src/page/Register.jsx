@@ -39,22 +39,21 @@ export default function Register() {
         body: JSON.stringify(form),
       });
 
-      // 🟢 Debug log
-      console.log("📌 API URL:", `${API}/api/auth/register`);
-      console.log("📌 Response status:", res.status);
+      console.log("API URL:", `${API}/api/auth/register`);
+      console.log("Response status:", res.status);
 
       const data = await res.json().catch(() => ({}));
-      console.log("📌 Response body:", data);
+      console.log("Response body:", data);
 
       if (res.ok) {
-        setMessage("✅ สมัครสมาชิกสำเร็จ");
+        setMessage("สมัครสมาชิกสำเร็จ");
         setForm({ name: "", email: "", phone: "", password: "" });
         setTimeout(() => navigate("/login"), 700);
       } else {
-        setMessage(`❌ ${data?.error || "สมัครสมาชิกไม่สำเร็จ"}`);
+        setMessage(`${data?.error || "สมัครสมาชิกไม่สำเร็จ"}`);
       }
     } catch {
-      setMessage("❌ Server error");
+      setMessage("Server error");
     } finally {
       setLoading(false);
     }
@@ -89,7 +88,6 @@ export default function Register() {
               <input id="phone" type="tel" name="phone"
                      style={ui.input} value={form.phone} 
                      onChange={(e) => {
-                      // ✅ เอาเฉพาะตัวเลข และจำกัดไม่เกิน 10 หลัก
                       const onlyNums = e.target.value.replace(/\D/g, "");
                       if (onlyNums.length <= 10) {
                         setForm({ ...form, phone: onlyNums });

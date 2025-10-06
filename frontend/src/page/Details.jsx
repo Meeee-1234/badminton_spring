@@ -1,17 +1,15 @@
-// src/Details.jsx
+
 import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
 
-/** ===== CONFIG ===== */
 const OPEN_HOUR = 9;
-const CLOSE_HOUR = 21; // ช่องสุดท้าย 20:00–21:00
+const CLOSE_HOUR = 21; 
 const HOURS = Array.from({ length: CLOSE_HOUR - OPEN_HOUR }, (_, i) => OPEN_HOUR + i);
 const COURTS = [1, 2, 3, 4, 5, 6];
 const PRICE_PER_HOUR = 120;
 
-/** THEME (โทนเขียวอ่อน) */
 const colors = {
   primary: "#34d399",
   primaryDark: "#10b981",
@@ -28,14 +26,13 @@ const colors = {
   taken: "#eef2f4",
 };
 
-/** เปลี่ยนเส้นทาง API ให้ตรงกับระบบคุณ */
 const ENDPOINTS = {
   taken: (date) => `${API}/api/bookings/taken?date=${encodeURIComponent(date)}`,
   mine: (date, userId) => `${API}/api/bookings/my/${encodeURIComponent(userId)}/${encodeURIComponent(date)}`,
   create: `${API}/api/bookings`,
 };
 
-/** ใช้วันที่แบบ Local (แก้ปัญหา UTC คลาดวัน) */
+// ใช้วันที่แบบ local
 const toDateKey = (d = new Date()) => {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -53,27 +50,22 @@ const msUntilNextMidnightLocal = () => {
 export default function Details() {
   const navigate = useNavigate();
 
-  // 🔒 วัน “วันนี้” อัตโนมัติ + เด้งเปลี่ยนเองตอนเที่ยงคืน
   const [dateKey, setDateKey] = useState(() => toDateKey());
-  const [taken, setTaken] = useState([]);       // ["1:9","2:10"]
-  const [mine, setMine]   = useState([]);       // ["1:9","2:10"] ของผู้ใช้
-  const [selected, setSelected] = useState([]); // [{court, hour}]
+  const [taken, setTaken] = useState([]);      
+  const [mine, setMine]   = useState([]);       
+  const [selected, setSelected] = useState([]); 
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
-
-  // ✅ สเกลอัตโนมัติให้ “พอดีจอ”
   const [scale, setScale] = useState(1);
   const viewportRef = useRef(null);
   const contentRef = useRef(null);
-
-  // เก็บ user ไว้ reuse
   const userRef = useRef(null);
+
   useEffect(() => {
     userRef.current = JSON.parse(localStorage.getItem("auth:user") || "{}");
   }, []);
 
-  // คำนวณ scale เมื่อโหลด/เปลี่ยนขนาดหน้าต่าง/เนื้อหา
   useLayoutEffect(() => {
     const calc = () => {
       const ct = contentRef.current;
@@ -116,7 +108,6 @@ export default function Details() {
     };
   }, []);
 
-  // อัปเดตเป็นวันใหม่อัตโนมัติ "เที่ยงคืน (Local)" + กันเคส Sleep/ปลุกแท็บ
   useEffect(() => {
     let midnightTimer;
 
@@ -125,11 +116,10 @@ export default function Details() {
       midnightTimer = setTimeout(() => {
         const today = toDateKey(new Date());
         setDateKey(prev => (prev !== today ? today : prev));
-        scheduleNext(); // นัดหมายเที่ยงคืนถัดไป
+        scheduleNext(); 
       }, msUntilNextMidnightLocal());
     };
 
-    // sync ทันทีรอบแรก (กันเคสเปิดทิ้งไว้ข้ามวัน)
     const todayNow = toDateKey(new Date());
     setDateKey(prev => (prev !== todayNow ? todayNow : prev));
     scheduleNext();
@@ -138,7 +128,7 @@ export default function Details() {
       if (document.visibilityState === "visible") {
         const t = toDateKey(new Date());
         setDateKey(prev => (prev !== t ? t : prev));
-        scheduleNext(); // รีเซ็ตนัดหมายให้ตรงเที่ยงคืนถัดไป
+        scheduleNext(); 
       }
     };
     document.addEventListener("visibilitychange", onVisible);
@@ -149,15 +139,11 @@ export default function Details() {
     };
   }, []);
 
-  // เคลียร์สถานะเลือก/ข้อความเมื่อวันเปลี่ยน
   useEffect(() => {
     setSelected([]);
     setMsg("");
   }, [dateKey]);
 
-  /** ========= โหลดสถานะจอง (taken + mine) =========
-   *  ใช้ซ้ำได้ทั้งจากปุ่ม "รีเฟรช" / โฟกัสหน้าต่าง / interval
-   */
   const loadTakenMine = useCallback(async () => {
     try {
       const user = userRef.current || JSON.parse(localStorage.getItem("auth:user") || "{}");
@@ -186,18 +172,15 @@ export default function Details() {
       }
     } catch (err) {
       console.error("Load bookings error:", err);
-      // ไม่ขึ้น error บ่อยเกินไป รบกวนผู้ใช้
     }
   }, [dateKey]);
 
-  // โหลดครั้งแรก + ตั้ง interval (polling) + โหลดเมื่อหน้าต่างโฟกัส
   useEffect(() => {
     let cancelled = false;
     loadTakenMine();
     const onFocus = () => loadTakenMine();
     window.addEventListener("focus", onFocus);
 
-    // ปรับช่วงเวลาได้ตามต้องการ (เช่น 7–15 วินาที)
     const intervalId = setInterval(() => {
       if (!cancelled) loadTakenMine();
     }, 10000);
@@ -209,32 +192,31 @@ export default function Details() {
     };
   }, [loadTakenMine]);
 
-  const formatHourLabel = (h) => `${h.toString().padStart(2, "0")}:00 - ${h + 1}:00`;
-  const getStatus = (c, h) => {
-  const cell = taken.find(t => t.key === `${c}:${h}`);
-  return cell ? cell.status : null; // คืนค่า "booked" หรือ "arrived"
-};
+    const formatHourLabel = (h) => `${h.toString().padStart(2, "0")}:00 - ${h + 1}:00`;
+    const getStatus = (c, h) => {
+    const cell = taken.find(t => t.key === `${c}:${h}`);
+    return cell ? cell.status : null; // คืนค่า "booked" หรือ "arrived"
+  };
 
   const isMine  = (c, h) => mine.includes(`${c}:${h}`);
   const isSelected = (c, h) => selected.some((s) => s.court === c && s.hour === h);
 
- const toggleCell = (c, h) => {
-  const status = getStatus(c, h);
-  if (status === "arrived" || status === "booked") return; // ❌ กันไม่ให้เลือกถ้าเต็ม
-  setSelected((prev) =>
-    prev.some((s) => s.court === c && s.hour === h)
-      ? prev.filter((s) => !(s.court === c && s.hour === h))
-      : [...prev, { court: c, hour: h }]
-  );
-};
-
+  const toggleCell = (c, h) => {
+    const status = getStatus(c, h);
+    if (status === "arrived" || status === "booked") return; // ❌ กันไม่ให้เลือกถ้าเต็ม
+    setSelected((prev) =>
+      prev.some((s) => s.court === c && s.hour === h)
+        ? prev.filter((s) => !(s.court === c && s.hour === h))
+        : [...prev, { court: c, hour: h }]
+    );
+  };
 
   const handleConfirm = async () => {
     setLoading(true);
     setMsg("");
     try {
       const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
-      const token = localStorage.getItem("auth:token");   // ✅ ดึง token
+      const token = localStorage.getItem("auth:token");  
       
       if (!user?._id || !token) {
         setMsg("❌ กรุณาเข้าสู่ระบบก่อนจอง");
@@ -247,13 +229,13 @@ export default function Details() {
           method: "POST",
           headers: { 
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,   // ✅ ส่ง token ให้ backend
+            Authorization: `Bearer ${token}`, 
           },
           body: JSON.stringify({
             date: dateKey,
             court: s.court,
             hour: s.hour,
-            note,  // ถ้ามีหมายเหตุ
+            note,  
           }),
         });
 
@@ -265,7 +247,6 @@ export default function Details() {
         }
       }
 
-      // ✅ อัพเดต state แบบ optimistic และเคลียร์รายการเลือก
       setMsg("✅ จองสำเร็จ!");
       const newKeys = selected.map((s) => `${s.court}:${s.hour}`);
       setMine((prev) => [...prev, ...newKeys]);
@@ -273,7 +254,6 @@ export default function Details() {
       setSelected([]);
       setNote("");
 
-      // ✅ ดึงสถานะจริงจากเซิร์ฟเวอร์อีกรอบ ป้องกัน desync
       loadTakenMine();
     } catch (err) {
       console.error("Booking error:", err);
@@ -289,33 +269,26 @@ export default function Details() {
 
   return (
     <div ref={viewportRef} style={ui.page}>
-      {/* ✅ ตัวคอนเทนต์จริง — จะถูกสเกลให้พอดีจออัตโนมัติ */}
       <div ref={contentRef} style={ui.contentWrap}>
         <div style={ui.container}>
-          {/* ซ้าย: ตาราง */}
+
           <section style={ui.left}>
             <div style={ui.toolbar}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <button type="button" onClick={goHome} style={ui.backBtn} title="กลับหน้าแรก">
                   ← กลับหน้าแรก
                 </button>
+
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <label htmlFor="date" style={ui.labelSm}>วันที่ (อัตโนมัติ)</label>
-                  {/* แสดงผลอย่างเดียว — เด้งเป็นวันใหม่ตอนเที่ยงคืน */}
-                  <input
-                    id="date"
-                    type="date"
-                    value={dateKey}
-                    disabled
-                    readOnly
-                    title="ระบบจะอัปเดตเป็นวันใหม่โดยอัตโนมัติทุกเที่ยงคืน"
-                    style={{ ...ui.dateInput, background: colors.primarySoft, borderColor: colors.primary }}
-                  />
+
+                  <input id="date" type="date" value={dateKey} disabled readOnly
+                         title="ระบบจะอัปเดตเป็นวันใหม่โดยอัตโนมัติทุกเที่ยงคืน"
+                         style={{ ...ui.dateInput, background: colors.primarySoft, borderColor: colors.primary }}/>
                   <span style={ui.badgeNote}>ตาราง “วันนี้” • อัปเดตอัตโนมัติเที่ยงคืน</span>
                 </div>
               </div>
 
-              {/* Legend + ปุ่มรีเฟรช */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <div style={ui.legendWrap} aria-hidden>
                   <span style={ui.legendItem}><span style={ui.dotMine} /> ของฉัน</span>
@@ -324,27 +297,14 @@ export default function Details() {
                   <span style={ui.legendItem}><span style={ui.dotTaken} /> เต็ม</span>
                 </div>
 
-                {/* ✅ ปุ่มรีเฟรชตอนนี้ */}
-                <button
-                  type="button"
-                  onClick={loadTakenMine}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 10,
-                    border: `1px solid ${colors.primaryDark}`,
-                    background: colors.primarySoft,
-                    color: colors.primaryDark,
-                    fontWeight: 800,
-                    cursor: "pointer",
-                  }}
-                  title="ดึงสถานะล่าสุดอีกครั้ง (เช่น มีคนยกเลิกจากฝั่งแอดมิน)"
-                >
+                <button type="button" onClick={loadTakenMine}
+                        style={{ padding: "8px 12px", borderRadius: 10, border: `1px solid ${colors.primaryDark}`, background: colors.primarySoft, color: colors.primaryDark, fontWeight: 800, cursor: "pointer", }}
+                        title="ดึงสถานะล่าสุดอีกครั้ง (เช่น มีคนยกเลิกจากฝั่งแอดมิน)" >
                   รีเฟรชตอนนี้
                 </button>
               </div>
             </div>
 
-            {/* ตารางคอร์ต x ชั่วโมง */}
             <div style={ui.tableFrame}>
               <div style={ui.headerRow}>
                 <div style={{ ...ui.headerCell, width: 140, textAlign: "left" }}>ช่วงเวลา</div>
@@ -358,43 +318,40 @@ export default function Details() {
                   <div key={h} role="row" style={{ ...ui.row, ...(idx % 2 === 1 ? ui.rowAlt : null) }}>
                     <div role="cell" style={{ ...ui.timeCell }}>{formatHourLabel(h)}</div>
                     {COURTS.map((c) => {
-  const status   = getStatus(c, h);   // ⬅️ ใช้แทน isTaken
-  const mineCell = isMine(c, h);
-  const picked   = isSelected(c, h);
+                      const status   = getStatus(c, h);   
+                      const mineCell = isMine(c, h);
+                      const picked   = isSelected(c, h);
 
-  let label, styleForCell;
+                      let label, styleForCell;
 
-  if (mineCell) {
-    label = "ของฉัน";
-    styleForCell = ui.cellMine;
-  } else if (status === "arrived" || status === "booked") {
-    label = "เต็ม"; // มาแล้ว หรือ จองแล้ว → เต็ม
-    styleForCell = ui.cellTaken;
-  } else if (picked) {
-    label = "เลือกแล้ว";
-    styleForCell = ui.cellPicked;
-  } else {
-    label = "ว่าง";
-    styleForCell = ui.cellFree;
-  }
+                      if (mineCell) {
+                        label = "ของฉัน";
+                        styleForCell = ui.cellMine;
+                      } else if (status === "arrived" || status === "booked") {
+                        label = "เต็ม"; // มาแล้ว หรือ จองแล้ว → เต็ม
+                        styleForCell = ui.cellTaken;
+                      } else if (picked) {
+                        label = "เลือกแล้ว";
+                        styleForCell = ui.cellPicked;
+                      } else {
+                        label = "ว่าง";
+                        styleForCell = ui.cellFree;
+                      }
 
                       const commonBtnStyle = { ...ui.cellBtn, ...styleForCell };
-const btnProps = mineCell
-  ? { disabled: false, "aria-disabled": true, style: { ...commonBtnStyle, ...ui.mineNoDim } }
-  : { disabled: status === "arrived" || status === "booked", style: commonBtnStyle };
+                      const btnProps = mineCell
+                        ? { disabled: false, "aria-disabled": true, style: { ...commonBtnStyle, ...ui.mineNoDim } }
+                        : { disabled: status === "arrived" || status === "booked", style: commonBtnStyle };
 
-return (
-  <button
-    key={`${c}:${h}`}
-    onClick={() => toggleCell(c, h)}
-    aria-pressed={picked}
-    aria-label={`คอร์ต ${c} เวลา ${formatHourLabel(h)}: ${label}`}
-    {...btnProps}
-  >
-    <span style={ui.statusPill(status, picked, mineCell)}>{label}</span>
-  </button>
-);
-
+                      return (
+                        <button key={`${c}:${h}`}
+                            onClick={() => toggleCell(c, h)}
+                            aria-pressed={picked}
+                            aria-label={`คอร์ต ${c} เวลา ${formatHourLabel(h)}: ${label}`}
+                            {...btnProps} >
+                          <span style={ui.statusPill(status, picked, mineCell)}>{label}</span>
+                        </button>
+                      );
                     })}
                   </div>
                 ))}
@@ -402,7 +359,6 @@ return (
             </div>
           </section>
 
-          {/* ขวา: สรุปการจอง */}
           <aside style={ui.right}>
             <div style={ui.card}>
               <h2 style={ui.cardTitle}>สรุปการจอง</h2>
@@ -469,7 +425,6 @@ return (
   );
 }
 
-/** ===== UI (ออกแบบให้สวย แล้วสเกลทั้งบล็อกให้พอดีจอ) ===== */
 const ui = {
   page: {
     minHeight: "100vh",
@@ -495,7 +450,6 @@ const ui = {
     gap: 16,
   },
 
-  /* Left */
   left: { minWidth: 0 },
   toolbar: {
     display: "flex",
@@ -533,7 +487,6 @@ const ui = {
     outline: "none",
   },
 
-  /* Legend */
   legendWrap: {
     display: "flex",
     alignItems: "center",
@@ -550,8 +503,6 @@ const ui = {
   dotPicked:{ display: "inline-block", width: 12, height: 12, borderRadius: 999, background: colors.primary, border: `1px solid ${colors.primaryDark}` },
   dotTaken: { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: colors.taken, border: `1px solid ${colors.lineStrong}` },
   dotMine:  { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: "#dcfce7", border: `1px solid ${colors.success}` },
-
-  /* กรอบตาราง */
   tableFrame: {
   background: colors.card,
   border: `1px solid ${colors.lineStrong}`,
@@ -618,15 +569,15 @@ const ui = {
     color: "#9ca3af",
     cursor: "not-allowed",
   },
-  // ✅ สีเขียวสำหรับ “ของฉัน”
+
   cellMine: {
-    background: "#bbf7d0", // เขียวสด (tailwind: green-300)
+    background: "#bbf7d0",
     boxShadow: `inset 0 0 0 2px ${colors.success}`,
     color: "#065f46",
     fontWeight: 700,
     cursor: "not-allowed",
   },
-  // ป้องกันปุ่มซีด/หรี่เวลาเป็นของฉัน (ไม่ใช้ disabled จริง แต่ให้กดไม่ติด)
+  
   mineNoDim: {
     pointerEvents: "none",
     cursor: "not-allowed",
@@ -634,36 +585,35 @@ const ui = {
     filter: "none",
   },
 
-statusPill: (status, isPicked, isMine) => ({
-  fontSize: 12,
-  fontWeight: 800,
-  padding: "6px 10px",
-  borderRadius: 999,
-  border: `1px solid ${
-    isMine ? colors.success
-    : (status === "arrived" || status === "booked") ? colors.lineStrong
-    : isPicked ? colors.primaryDark
-    : colors.lineStrong
-  }`,
-  background: isMine
-    ? "#22c55e"
-    : (status === "arrived" || status === "booked")
-      ? "#f1f5f9"
-      : isPicked
-        ? "#dcfce7"
-        : "#ffffff",
-  color: isMine
-    ? "#fff"
-    : (status === "arrived" || status === "booked")
-      ? "#94a3b8"
-      : isPicked
-        ? colors.success
-        : colors.ink,
-  letterSpacing: 0.2,
-}),
+  statusPill: (status, isPicked, isMine) => ({
+    fontSize: 12,
+    fontWeight: 800,
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: `1px solid ${
+      isMine ? colors.success
+      : (status === "arrived" || status === "booked") ? colors.lineStrong
+      : isPicked ? colors.primaryDark
+      : colors.lineStrong
+    }`,
+    background: isMine
+      ? "#22c55e"
+      : (status === "arrived" || status === "booked")
+        ? "#f1f5f9"
+        : isPicked
+          ? "#dcfce7"
+          : "#ffffff",
+    color: isMine
+      ? "#fff"
+      : (status === "arrived" || status === "booked")
+        ? "#94a3b8"
+        : isPicked
+          ? colors.success
+          : colors.ink,
+    letterSpacing: 0.2,
+  }),
 
 
-  /* Right */
   right: { minWidth: 0 },
   card: {
     background: colors.card,

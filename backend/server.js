@@ -1,14 +1,20 @@
 
-const express = require("express"); // Framework สร้าง REST API
-const mongoose = require("mongoose"); // เชื่อมต่อและจัดการ MongoDB
-const cors = require("cors"); // อนุญาตให้ frontend (React) เรียก API ได้
-const bcrypt = require("bcrypt"); // Hash password
-const jwt = require("jsonwebtoken"); // ใช้สร้าง token สำหรับ Auth
-require("dotenv").config(); // โหลดค่าจาก .env -> MONGODB_URI, JWT_SECRET
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+require("dotenv").config();
 
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+
+// ---------- Start Server ----------
+app.listen(PORT, () => {
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
+});
 
 
 // ---------- CORS ----------
@@ -31,10 +37,10 @@ app.use(express.json());
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
-    console.log("✅ Connected to MongoDB");
-    console.log("📌 Using DB:", mongoose.connection.db.databaseName);
+    console.log("Connected to MongoDB");
+    console.log("Using DB:", mongoose.connection.db.databaseName);
   })
-  .catch((err) => console.error("❌ MongoDB error:", err.message));
+  .catch((err) => console.error("MongoDB error:", err.message));
 
 
 // ---------- User Schema ----------
@@ -43,7 +49,7 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     phone: { type: String, required: true },
-    password: { type: String, required: true }, // hash password
+    password: { type: String, required: true }, 
     role: { type: String, enum: ["user", "admin"], default: "user" },
     isDeleted: { type: Boolean, default: false }
   },
@@ -70,13 +76,13 @@ const Profile = mongoose.model("Profile", profileSchema);
 const bookingSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    date: { type: String, required: true }, // YYYY-MM-DD
-    court: { type: Number, required: true }, // คอร์ต 1-6
-    hour: { type: Number, required: true },  // ชั่วโมง เช่น 9 = 9:00-10:00
+    date: { type: String, required: true },
+    court: { type: Number, required: true }, 
+    hour: { type: Number, required: true }, 
     status: { 
       type: String, 
       enum: ["booked", "arrived", "canceled"], 
-      default: "booked"   // เวลาจองใหม่ → สถานะ = จองแล้ว
+      default: "booked"  
     },
   },
   { timestamps: true, collection: "bookings" }
@@ -90,15 +96,15 @@ async function createAdmin() {
   const adminEmail = "admin@gmail.com";
   const exists = await User.findOne({ email: adminEmail });
   if (!exists) {
-    const hash = await bcrypt.hash("Admin1234!", 10); // ✅ hash password ก่อน
+    const hash = await bcrypt.hash("Admin1234!", 10); 
     await User.create({
       name: "Admin",
-      email: adminEmail,      // ✅ ใช้ตัวแปรที่เป็น string ข้างบน
+      email: adminEmail,      
       phone: "0812345678",
-      password: hash,         // ✅ เก็บ hash ไม่ใช่ plain text
+      password: hash,        
       role: "admin",
     });
-    console.log("✅ Admin user created");
+    console.log("Admin user created");
   }
 }
 createAdmin();
@@ -122,7 +128,7 @@ function isAdmin(req, res, next) {
 }
 
 
-// ✅ ตรวจสอบ user ที่ login + ไม่ถูกลบ
+// ตรวจสอบ user ที่ login + ไม่ถูกลบ
 function authRequired(req, res, next) {
   try {
     const token = req.headers.authorization?.split(" ")[1];
@@ -134,7 +140,7 @@ function authRequired(req, res, next) {
       if (!user || user.isDeleted) {
         return res.status(403).json({ error: "บัญชีนี้ถูกปิดการใช้งาน" });
       }
-      req.user = user; // เก็บ user ไว้ใช้ใน route
+      req.user = user;
       next();
     });
   } catch (err) {
@@ -144,6 +150,7 @@ function authRequired(req, res, next) {
 
 
 // ---------- Admin Routes ----------
+// รายชื่อผู้ใช้งานทั้งหมด (ยังไม่ถูกลบ)
 app.get("/api/admin/users", isAdmin, async (req, res) => {
   try {
     const users = await User.find({ isDeleted: { $ne: true } }).select("-password");
@@ -154,10 +161,11 @@ app.get("/api/admin/users", isAdmin, async (req, res) => {
   }
 });
 
-
+// ดึงประวัติการจองทั้งหมดของ user
 app.get("/api/admin/bookings", isAdmin, async (req, res) => {
   try {
     const bookings = await Booking.find().populate("user", "name email");
+
     const formatted = bookings.map((b) => ({
       _id: b._id,
       user: b.user ? { name: b.user.name, email: b.user.email } : null,
@@ -173,17 +181,15 @@ app.get("/api/admin/bookings", isAdmin, async (req, res) => {
 });
 
 
-// ✏️ Soft Delete User (Admin only)
+// Soft Delete User (Admin only)
 app.delete("/api/admin/users/:id", isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // เช็คว่า id ถูกต้องมั้ย
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ error: "ID ไม่ถูกต้อง (ต้องเป็น ObjectId)" });
     }
-
-    // อัปเดตค่า isDeleted = true
+    
     const user = await User.findByIdAndUpdate(
       id,
       { isDeleted: true },
@@ -199,13 +205,13 @@ app.delete("/api/admin/users/:id", isAdmin, async (req, res) => {
       user
     });
   } catch (err) {
-    console.error("❌ Soft delete error:", err.message);
+    console.error("Soft delete error:", err.message);
     res.status(500).json({ error: "Server error", detail: err.message });
   }
 });
 
 
-// ✅ Update booking status (Admin only)
+// Update booking status (Admin only)
 app.put("/api/admin/bookings/:id/status", isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -227,29 +233,9 @@ app.put("/api/admin/bookings/:id/status", isAdmin, async (req, res) => {
 
     res.json({ message: "อัพเดตสถานะเรียบร้อย", booking });
   } catch (err) {
-    console.error("❌ Update booking status error:", err.message);
+    console.error("Update booking status error:", err.message);
     res.status(500).json({ error: "Server error" });
  }
-});
-
-
-// ✅ ดึงการจองทั้งหมดของ user
-app.get("/api/bookings/user/:userId", async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ error: "ID ไม่ถูกต้อง" });
-    }
-
-    const bookings = await Booking.find({ user: userId })
-      .sort({ date: -1, hour: 1 }); // เรียงวันที่ล่าสุดก่อน
-
-    res.json({ bookings });
-  } catch (err) {
-    console.error("❌ User bookings error:", err.message);
-    res.status(500).json({ error: "Server error" });
-  }
 });
 
 
@@ -258,7 +244,7 @@ app.get("/", (req, res) => {
   res.json({ message: "Welcome to the Badminton API!" });
 });
 
-// ➕ Register
+// Register
 app.post("/api/auth/register", async (req, res) => {
   try {
     const { name, email, phone, password } = req.body;
@@ -277,28 +263,18 @@ app.post("/api/auth/register", async (req, res) => {
     const hash = await bcrypt.hash(password, 10);
     const user = await User.create({ name, email, phone, password: hash });
 
+    // ป้องกันไม่ให้ส่ง password กลับไปที่ client
     const { password: _, ...safeUser } = user.toObject();
     return res.status(201).json({ message: "สมัครสมาชิกสำเร็จ", user: safeUser });
   } catch (err) {
-    console.error("❌ Register error:", err.message);
+    console.error("Register error:", err.message);
     return res.status(500).json({ error: "Server error", detail: err.message });
   }
 });
 
 
-// 📄 Get users
-app.get("/api/users", async (req, res) => {
-  try {
-    const users = await User.find({}, { password: 0 }).lean();
-    res.json(users);
-  } catch (err) {
-    console.error("❌ Get users error:", err.message);
-    res.status(500).json({ error: "Server error while fetching users" });
-  }
-});
 
-
-// 📄 Login
+// Login
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -313,7 +289,6 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(401).json({ error: "ไม่พบบัญชีนี้" });
     }
 
-    // ✅ ถ้าโดน Soft Delete → ห้ามเข้า
     if (user.isDeleted) {
       return res.status(403).json({ error: "บัญชีนี้ถูกปิดการใช้งาน" });
     }
@@ -326,24 +301,23 @@ app.post("/api/auth/login", async (req, res) => {
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET || "supersecret",
-      { expiresIn: "1d" }
+      { expiresIn: "1d" } // token มีอายุ 1 วัน
     );
 
     const { password: _, ...safeUser } = user.toObject();
     res.json({ message: "เข้าสู่ระบบสำเร็จ", token, user: safeUser });
   } catch (err) {
-    console.error("❌ Login error:", err.message);
+    console.error("Login error:", err.message);
     res.status(500).json({ error: "Server error", detail: err.message });
   }
 });
 
 
-// 📄 Get user by id
+// Get user by id
 app.get("/api/users/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    // ✅ เช็คว่า id เป็น ObjectId ถูกต้องมั้ย
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ error: "ID ไม่ถูกต้อง (ต้องเป็น ObjectId)" });
     }
@@ -356,13 +330,13 @@ app.get("/api/users/:id", async (req, res) => {
 
     res.json(user);
   } catch (err) {
-    console.error("❌ Get user by id error:", err.message);
+    console.error("Get user by id error:", err.message);
     res.status(500).json({ error: "Server error", detail: err.message });
   }
 });
 
 
-// ✏️ Update user by id
+// Update user by id
 app.patch("/api/users/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -384,15 +358,14 @@ app.patch("/api/users/:id", async (req, res) => {
 
     res.json({ message: "อัพเดตข้อมูลเรียบร้อยแล้ว", user });
   } catch (err) {
-    console.error("❌ Update user error:", err.message);
+    console.error("Update user error:", err.message);
     res.status(500).json({ error: "Server error", detail: err.message });
   }
 });
 
 
 // ---------- Booking Routes ----------
-// ✅ ดูช่วงเวลาที่ถูกจองแล้ว (เฉพาะที่ยัง active)
-// ✅ ดูช่วงเวลาที่ถูกจองแล้ว (เฉพาะวันนั้น และไม่รวม canceled)
+// check สนามกับเวลาไหนที่ถูกจองไปแล้ว
 app.get("/api/bookings/taken", async (req, res) => {
   try {
     const { date } = req.query;
@@ -401,37 +374,35 @@ app.get("/api/bookings/taken", async (req, res) => {
       return res.status(400).json({ error: "ต้องส่ง date รูปแบบ YYYY-MM-DD" });
     }
 
+    // ป้องกันไม่ให้เก็บ cache ของ response ไว้ เพราะว่าข้อมูลมันมีการเปลี่ยนแปลงตลอด
     res.set({
       "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
       "Pragma": "no-cache",
       "Expires": "0",
       "Surrogate-Control": "no-store",
-    });
+    }); 
 
-    // ✅ whitelist ของสถานะที่นับว่าเต็ม
-    const ACTIVE = ["booked", "arrived"]; // ถ้าคุณใช้ checked_in ให้เปลี่ยนตรงนี้
+    const ACTIVE = ["booked", "arrived"]; 
 
-    // ✅ ดึงข้อมูลที่ต้องใช้
     const rows = await Booking.find(
       { date, status: { $in: ACTIVE } },
       { court: 1, hour: 1, status: 1, _id: 0 }
     ).lean();
 
-    // ✅ map ออกมาเป็น { key, status }
     const taken = rows.map(r => ({
-      key: `${r.court}:${r.hour}`,
+      key: `${r.court}:${r.hour}`, // 2:6
       status: r.status
     }));
 
     return res.json({ taken });
   } catch (err) {
-    console.error("❌ Get taken error:", err);
+    console.error("Get taken error:", err);
     return res.status(500).json({ error: "Server error" });
   }
 });
 
 
-// ✅ จองสนามใหม่ (ต้อง login)
+// จองสนามใหม่ (ต้อง login)
 app.post("/api/bookings", authRequired, async (req, res) => {
   try {
     const { date, court, hour, note } = req.body;
@@ -441,12 +412,11 @@ app.post("/api/bookings", authRequired, async (req, res) => {
       return res.status(400).json({ error: "ต้องส่ง date, court, hour" });
     }
 
-    // ✅ แก้เป็นแบบนี้
     const exists = await Booking.findOne({ 
       date, 
       court, 
       hour, 
-      status: { $in: ["booked", "arrived"] }   // นับแค่ที่ยัง active
+      status: { $in: ["booked", "arrived"] } 
     });
     if (exists) {
       return res.status(409).json({ error: "ช่วงเวลานี้ถูกจองแล้ว" });
@@ -468,19 +438,36 @@ app.post("/api/bookings", authRequired, async (req, res) => {
 });
 
 
-// ✅ ดูการจองของ user ตามวัน (ไม่เอาที่ถูกยกเลิก)
-// GET /api/bookings/my/:userId/:date
+// ดึงการจองทั้งหมดของ user
+app.get("/api/bookings/user/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: "ID ไม่ถูกต้อง" });
+    }
+
+    const bookings = await Booking.find({ user: userId })
+      .sort({ date: -1, hour: 1 }); // เรียงวันที่ล่าสุดก่อน
+
+    res.json({ bookings });
+  } catch (err) {
+    console.error("User bookings error:", err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+
+// ดูการจองของ user ตามวัน (ไม่เอาที่ถูกยกเลิก)
 app.get("/api/bookings/my/:userId/:date", async (req, res) => {
   try {
     const { userId, date } = req.params;
 
-    // ✅ validate พารามิเตอร์
     if (!userId) return res.status(400).json({ error: "ต้องส่ง userId" });
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return res.status(400).json({ error: "ต้องส่ง date รูปแบบ YYYY-MM-DD" });
     }
 
-    // ✅ ปิดแคชกันค้าง
     res.set({
       "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
       "Pragma": "no-cache",
@@ -488,29 +475,26 @@ app.get("/api/bookings/my/:userId/:date", async (req, res) => {
       "Surrogate-Control": "no-store",
     });
 
-    // ✅ ใช้ whitelist ของสถานะแทน $ne เพื่อตัดปัญหา canceled/cancelled
-    //    (เอาเฉพาะที่ยังมีผลกับการจองบนตาราง)
     const allowed = ["booked", "checked_in"];
 
     const myBookings = await Booking.find(
       { user: userId, date, status: { $in: allowed } },
-      { court: 1, hour: 1, _id: 0 } // projection เฉพาะที่ต้องใช้
+      { court: 1, hour: 1, _id: 0 }
     )
       .sort({ hour: 1 })
       .lean();
 
-    // ✅ แปลงเป็น ["1:9", "2:10", ...]
-    const mine = (myBookings || []).map((b) => `${Number(b.court)}:${Number(b.hour)}`);
+    const mine = (myBookings || []).map((b) => `${Number(b.court)}:${Number(b.hour)}`); // 1:9 , 2:10
 
     return res.json({ mine });
   } catch (err) {
-    console.error("❌ My bookings error:", err);
+    console.error("My bookings error:", err);
     return res.status(500).json({ error: "Server error" });
   }
 });
 
 
-// POST หรือ PUT profile
+// profile
 app.post("/api/profile/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
@@ -519,16 +503,15 @@ app.post("/api/profile/:userId", async (req, res) => {
     const profile = await Profile.findOneAndUpdate(
       { user: userId },
       { emergencyName, emergencyPhone },
-      { new: true, upsert: true } // upsert = ถ้ายังไม่มี profile ให้สร้างใหม่
+      { new: true, upsert: true } // upsert ถ้ายังไม่มี profile ให้สร้างใหม่
     );
 
     res.json({ message: "อัพเดตโปรไฟล์เรียบร้อย", profile });
   } catch (err) {
-    console.error("❌ Profile update error:", err.message);
+    console.error("Profile update error:", err.message);
     res.status(500).json({ error: "Server error" });
   }
 });
-
 
 app.get("/api/profile/:userId", async (req, res) => {
   try {
@@ -541,13 +524,9 @@ app.get("/api/profile/:userId", async (req, res) => {
 
     res.json(profile);
   } catch (err) {
-    console.error("❌ Profile get error:", err.message);
+    console.error("Profile get error:", err.message);
     res.status(500).json({ error: "Server error" });
   }
 });
 
 
-// ---------- Start Server ----------
-app.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
-});

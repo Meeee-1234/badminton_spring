@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FiEye, FiEyeOff } from "react-icons/fi"; // 👁️ ใช้ react-icons
+import { FiEye, FiEyeOff } from "react-icons/fi"; 
 
 const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
 
@@ -19,6 +19,7 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage("");
+
     setLoading(true);
     try {
       const res = await fetch(`${API}/api/auth/login`, {
@@ -31,15 +32,15 @@ export default function Login() {
       if (res.ok) {
         if (data?.token) localStorage.setItem("auth:token", data.token);
         if (data?.user) localStorage.setItem("auth:user", JSON.stringify(data.user));
-        setMessage("✅ เข้าสู่ระบบสำเร็จ");
+        setMessage("เข้าสู่ระบบสำเร็จ");
         setForm({ email: "", password: "" });
         window.dispatchEvent(new Event("auth:changed"));
         setTimeout(() => navigate("/"), 500);
       } else {
-        setMessage(`❌ ${data?.error || "เข้าสู่ระบบไม่สำเร็จ"}`);
+        setMessage(`${data?.error || "เข้าสู่ระบบไม่สำเร็จ"}`);
       }
     } catch {
-      setMessage("❌ Server error");
+      setMessage("Server error");
     } finally {
       setLoading(false);
     }

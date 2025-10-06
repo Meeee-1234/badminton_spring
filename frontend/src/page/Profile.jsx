@@ -12,8 +12,8 @@ export default function Profile() {
   const [editForm, setEditForm] = useState({ name: "", email: "", phone: "" });
   const [message, setMessage] = useState("");
   const [userId, setUserId] = useState(null);
-  const [emergencyMessage, setEmergencyMessage] = useState("");
   const [bookings, setBookings] = useState([]);
+  const [emergencyMessage, setEmergencyMessage] = useState("");
   const [emergencyForm, setEmergencyForm] = useState({ emergencyName: "", emergencyPhone: "", });
 
   useEffect(() => {
@@ -65,15 +65,15 @@ export default function Profile() {
 
       const data = await res.json();
       if (res.ok) {
-        setMessage("✅ อัพเดตข้อมูลสำเร็จ");
+        setMessage("อัพเดตข้อมูลสำเร็จ");
         setUser({ ...user, name: data.user.name, phone: data.user.phone });
         localStorage.setItem("auth:user", JSON.stringify(data.user));
       } else {
-        setMessage(`❌ ${data.error || "อัพเดตไม่สำเร็จ"}`);
+        setMessage(`${data.error || "อัพเดตไม่สำเร็จ"}`);
       }
     } catch (err) {
       console.error("Update error:", err);
-      setMessage("❌ Server error");
+      setMessage("Server error");
     }
   };
 
@@ -100,13 +100,13 @@ export default function Profile() {
 
       const data = await res.json();
       if (res.ok) {
-        setEmergencyMessage("✅ อัพเดตข้อมูลฉุกเฉินสำเร็จ");
+        setEmergencyMessage("อัพเดตข้อมูลฉุกเฉินสำเร็จ");
       } else {
-        setEmergencyMessage(`❌ ${data.error || "อัพเดตไม่สำเร็จ"}`);
+        setEmergencyMessage(`${data.error || "อัพเดตไม่สำเร็จ"}`);
       }
     } catch (err) {
       console.error("Emergency update error:", err);
-      setEmergencyMessage("❌ Server error");
+      setEmergencyMessage("Server error");
     }
   };
 
@@ -279,10 +279,10 @@ export default function Profile() {
                   <td style={{ padding: "10px", border: "1px solid #e5e7eb", textAlign: "center" }}>
                       <span style={{ display: "inline-block", padding: "4px 10px", borderRadius: 12, fontWeight: 600, textAlign: "center", minWidth: 60,
                       backgroundColor:
-                      b.status === "booked" ? "#bfdbfe" : // เขียวอ่อน
-                      b.status === "arrived" ? "#bbf7d0" : // ฟ้าอ่อน
-                      b.status === "canceled" ? "#fecaca" : // แดงอ่อน
-                        "#e5e7eb", // เทา (ค่า default)
+                      b.status === "booked" ? "#bfdbfe" : 
+                      b.status === "arrived" ? "#bbf7d0" :
+                      b.status === "canceled" ? "#fecaca" : 
+                        "#e5e7eb",
                       color:
                       b.status === "booked" ? "#1e3a8a" :
                       b.status === "arrived" ? "#065f46" :

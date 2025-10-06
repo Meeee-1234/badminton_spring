@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 const API =
   process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
 
-/* ================= THEME (โทนเดียวกับ Details.jsx) ================ */
 const C = {
   bg: "#f6fef8",
   card: "#ffffff",
@@ -21,13 +20,11 @@ const C = {
   warn: "#f59e0b",
 };
 
-/* =============== CONFIG ================= */
 const OPEN_HOUR = 9;
 const CLOSE_HOUR = 21;
 const HOURS = Array.from({ length: CLOSE_HOUR - OPEN_HOUR }, (_, i) => OPEN_HOUR + i);
 const COURTS = [1, 2, 3, 4, 5, 6];
 
-/* ============ HELPERS & API ============ */
 const toDateKey = (d = new Date()) => {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -42,7 +39,6 @@ const ENDPOINTS = {
   setStatus: (id) => `${API}/api/admin/bookings/${id}/status`,
 };
 
-/* ============== EMIT UPDATE ============== */
 const emitUpdate = (date) => {
   try {
     if ("BroadcastChannel" in window) {
@@ -59,7 +55,6 @@ const emitUpdate = (date) => {
   } catch {}
 };
 
-/* ================ NORMALIZERS ================ */
 function normalizeStatus(raw) {
   const v = String(raw || "").toLowerCase();
   if (v === "checked_in" || v === "arrived") return "checked_in";
@@ -85,7 +80,6 @@ function pickListShape(data) {
   return [];
 }
 
-/* ============== STATUS BADGE ============== */
 function statusBadge(status) {
   switch (status) {
     case "booked":
@@ -99,7 +93,6 @@ function statusBadge(status) {
   }
 }
 
-/* ================ MAIN ================= */
 export default function AdminDetails() {
 
   const navigate = useNavigate();
@@ -108,16 +101,15 @@ export default function AdminDetails() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
-  const [filter, setFilter] = useState("all"); // all | booked | checked_in | canceled
+  const [filter, setFilter] = useState("all"); 
   const [refreshTs, setRefreshTs] = useState(Date.now());
 
-  // ✅ ช่องค้นหาชื่อ
   const [q, setQ] = useState("");
 
   useEffect(() => {
     const u = JSON.parse(localStorage.getItem("auth:user") || "{}");
     if (!u || u.role !== "admin") {
-      alert("❌ คุณไม่มีสิทธิ์การเข้าถึงหน้านี้ (Admin เท่านั้น)");
+      alert("คุณไม่มีสิทธิ์การเข้าถึงหน้านี้ (Admin เท่านั้น)");
       navigate("/");
     }
   }, [navigate]);
@@ -151,7 +143,7 @@ export default function AdminDetails() {
 
       setBookings(list);
     } catch (e) {
-      setMsg(`❌ โหลดข้อมูลไม่สำเร็จ: ${e.message || String(e)}`);
+      setMsg(`โหลดข้อมูลไม่สำเร็จ: ${e.message || String(e)}`);
     } finally {
       setLoading(false);
     }
@@ -168,7 +160,6 @@ export default function AdminDetails() {
     };
   }, [dateKey, refreshTs]);
 
-  // ✅ กรองตามสถานะ + คำค้นชื่อ (ไม่สนตัวพิมพ์)
   const filtered = useMemo(() => {
     let arr = filter === "all" ? bookings : bookings.filter((b) => b.status === filter);
     const kw = q.trim().toLowerCase();
@@ -178,7 +169,6 @@ export default function AdminDetails() {
     return arr;
   }, [bookings, filter, q]);
 
-  // ✅ ตารางซ้าย: ใช้เฉพาะที่ไม่ใช่ canceled (เพื่อไม่บล็อกช่อง) และยังคงเคารพคำค้น
   const bookingsMap = useMemo(() => {
     const map = {};
     for (const b of filtered) {
@@ -208,17 +198,17 @@ export default function AdminDetails() {
 
       if (newStatus === "canceled") {
         setBookings((prev) => prev.filter((b) => b._id !== id));
-        setMsg("✅ ยกเลิกแล้ว ช่องนี้ว่างให้คนอื่นจองได้");
+        setMsg("ยกเลิกแล้ว ช่องนี้ว่างให้คนอื่นจองได้");
       } else {
         setBookings((prev) =>
           prev.map((b) => (b._id === id ? { ...b, status: newStatus } : b))
         );
-        setMsg("✅ อัพเดตสถานะสำเร็จ");
+        setMsg("อัพเดตสถานะสำเร็จ");
       }
 
       emitUpdate(dateKey);
     } catch (err) {
-      setMsg("❌ " + (err.message || String(err)));
+      setMsg(" " + (err.message || String(err)));
       console.error(err);
     }
   };
@@ -403,7 +393,7 @@ export default function AdminDetails() {
   );
 }
 
-/* ================= STYLES =============== */
+
 const sx = {
   page: {
     minHeight: "100vh",
@@ -431,7 +421,6 @@ const sx = {
     flexWrap: "wrap",
   },
 
-  // ✅ สไตล์ Search
   searchWrap: {
     position: "relative",
   },
@@ -524,7 +513,6 @@ const sx = {
     fontSize: 13,
   }),
 
-  /* Layout */
   layout: {
     width: 1200,
     margin: "0 auto",
@@ -533,7 +521,6 @@ const sx = {
     gap: 16,
   },
 
-  /* Table card */
   card: {
     background: C.card,
     border: `1px solid ${C.line2}`,
@@ -578,7 +565,6 @@ const sx = {
     alignItems: "center",
   },
 
-  // กรอบเซลล์
   td: {
     padding: 0,
     borderLeft: `1px solid ${C.line}`,
@@ -590,7 +576,6 @@ const sx = {
     overflow: "hidden",
   },
 
-  // คอนเทนต์ใน cell
   cellFilled: (st) => ({
     display: "flex",
     flexDirection: "column",
@@ -639,7 +624,6 @@ const sx = {
     gap: 8,
   },
 
-  /* Sidebar */
   cardSide: {
     background: C.card,
     border: `1px solid ${C.line2}`,

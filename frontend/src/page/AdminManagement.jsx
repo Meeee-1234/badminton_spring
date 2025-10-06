@@ -5,13 +5,14 @@ import { useNavigate } from "react-router-dom";
 const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
 
 export default function AdminManagement() {
+  const navigate = useNavigate();
+
   const [users, setUsers] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState(""); 
-  const navigate = useNavigate();
-
+  
   const handleLogout = () => {
     localStorage.removeItem("auth:token");
     localStorage.removeItem("auth:user");
@@ -29,7 +30,7 @@ export default function AdminManagement() {
       });
 
       const text = await res.text();
-      console.log("📌 Raw response:", text);
+      console.log("Raw response:", text);
 
       let data;
       try {
@@ -41,20 +42,19 @@ export default function AdminManagement() {
       if (!res.ok) throw new Error(data.error || "ลบผู้ใช้ไม่สำเร็จ");
 
       setUsers((prev) => prev.filter((u) => u._id !== id));
-      alert("✅ " + data.message);
+      alert(" " + data.message);
     } catch (err) {
-      console.error("❌ Delete user error:", err);
-      alert("❌ " + err.message);
+      console.error("Delete user error:", err);
+      alert(" " + err.message);
     }
   };
 
-  // ✅ ตรวจสอบสิทธิ์ก่อนโหลดข้อมูล
   useEffect(() => {
     const token = localStorage.getItem("auth:token");
     const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
 
     if (!token || user.role !== "admin") {
-      alert("❌ คุณไม่มีสิทธิ์การเข้าถึงหน้านี้ (Admin เท่านั้น)");
+      alert("คุณไม่มีสิทธิ์การเข้าถึงหน้านี้ (Admin เท่านั้น)");
       navigate("/"); 
       return;
     }
@@ -82,18 +82,16 @@ export default function AdminManagement() {
         setBookings(bookingData.bookings || []);
       } catch (err) {
         console.error("โหลดข้อมูลล้มเหลว:", err);
-        setMessage("❌ โหลดข้อมูลไม่สำเร็จ");
+        setMessage("โหลดข้อมูลไม่สำเร็จ");
       } finally {
         setLoading(false);
       }
     }
-
     fetchData();
   }, [navigate]);
 
   if (loading) return <p>⏳ กำลังโหลด...</p>;
 
-   // ✅ ฟิลเตอร์ booking ก่อนแสดงผล
   const filteredBookings = bookings.filter((b) => {
     const keyword = searchTerm.toLowerCase();
     return (
@@ -190,7 +188,7 @@ export default function AdminManagement() {
                       b.status === "booked" ? "#bfdbfe" : 
                       b.status === "arrived" ? "#bbf7d0" : 
                       b.status === "canceled" ? "#fecaca" :
-                        "#e5e7eb", // เทา (ค่า default)
+                        "#e5e7eb", 
                       color:
                       b.status === "booked" ? "#1e3a8a" :
                       b.status === "arrived" ? "#065f46" :
