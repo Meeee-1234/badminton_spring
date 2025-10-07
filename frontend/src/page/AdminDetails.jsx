@@ -3,7 +3,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API =
-  process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
+  process.env.REACT_APP_API_URL || "https://badminton-spring-1.onrender.com";
 
 const C = {
   bg: "#f6fef8",

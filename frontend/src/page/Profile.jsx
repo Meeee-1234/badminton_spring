@@ -16,66 +16,92 @@ export default function Profile() {
   const [emergencyMessage, setEmergencyMessage] = useState("");
   const [emergencyForm, setEmergencyForm] = useState({ emergencyName: "", emergencyPhone: "", });
 
-  useEffect(() => {
-    const u = JSON.parse(localStorage.getItem("auth:user") || "{}");
-    if (u?._id) {
-      setUserId(u._id);
-      setUser({ name: u.name, email: u.email, phone: u.phone });
-      setEditForm({ name: u.name, email: u.email, phone: u.phone });
+useEffect(() => {
 
-      fetch(`${API}/api/profile/${u._id}`)
-      .then(res => {
-        if (!res.ok) throw new Error("ไม่พบข้อมูล");
-        return res.json();
-      })
-      .then(data => {
-        setEmergencyForm({
-          emergencyName: data.emergencyName || "",
-          emergencyPhone: data.emergencyPhone || ""
-        });
-      })
-      .catch(err => console.error("Emergency fetch error:", err));
+  const u = JSON.parse(localStorage.getItem("auth:user") || "{}");
+console.log("📦 Local user:", u); 
 
-      fetch(`${API}/api/bookings/user/${u._id}`)
-        .then(res => res.json())
-        .then(data => {
-          setBookings(data.bookings || []);
-        })
-        .catch(err => console.error("Booking fetch error:", err));
-    }
-  }, []);
+// ❗ เปลี่ยนจาก u._id เป็น u.id
+if (u?.id) {
+  setUserId(u.id); // ✅ ใช้ u.id
+  setUser({ name: u.name, email: u.email, phone: u.phone });
+  setEditForm({ name: u.name, email: u.email, phone: u.phone });
+
+  // ✅ Emergency profile
+  fetch(`${API}/api/profile/${u.id}`)
+    .then((res) => {
+      if (!res.ok) throw new Error("เกิดข้อผิดพลาด");
+      return res.json();
+    })
+    .then((data) => {
+      console.log("✅ Emergency profile data:", data);
+      setEmergencyForm({
+        emergencyName: data.emergencyName || "",
+        emergencyPhone: data.emergencyPhone || "",
+      });
+    })
+    .catch((err) => {
+      console.error("❌ Emergency profile fetch error:", err);
+      setEmergencyMessage("โหลดข้อมูลล้มเหลว");
+    });
+
+
+}
+
+}, []);
+
+
 
   const handleChange = (e) => {
     setEditForm({ ...editForm, [e.target.name]: e.target.value });
   };
+const handleSave = async (e) => {
+  e.preventDefault();
+  setMessage("⏳ กำลังบันทึก...");
 
-  const handleSave = async (e) => {
-    e.preventDefault();
-    setMessage("⏳ กำลังบันทึก...");
+  try {
+    const u = JSON.parse(localStorage.getItem("auth:user") || "{}");
+    const id = u.id;
 
-    try {
-      const res = await fetch(`${API}/api/users/${userId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: editForm.name,
-          phone: editForm.phone,
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setMessage("อัพเดตข้อมูลสำเร็จ");
-        setUser({ ...user, name: data.user.name, phone: data.user.phone });
-        localStorage.setItem("auth:user", JSON.stringify(data.user));
-      } else {
-        setMessage(`${data.error || "อัพเดตไม่สำเร็จ"}`);
-      }
-    } catch (err) {
-      console.error("Update error:", err);
-      setMessage("Server error");
+    if (!id) {
+      setMessage("❌ ไม่พบ ID ผู้ใช้งาน");
+      return;
     }
-  };
+
+    const res = await fetch(`${API}/api/users/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: editForm.name,
+        phone: editForm.phone,
+      }),
+    });
+
+    const data = await res.json();
+    console.log("🛠 PATCH response:", data);
+
+    if (res.ok) {
+      setMessage("✅ อัปเดตข้อมูลสำเร็จ");
+
+      // รองรับทั้งกรณี data.user หรือ data โดยตรง
+      const updated = data.user || data;
+
+      const updatedUser = {
+        ...u,
+        name: updated.name,
+        phone: updated.phone,
+      };
+
+      setUser(updatedUser);
+      localStorage.setItem("auth:user", JSON.stringify(updatedUser));
+    } else {
+      setMessage(`❌ ${data.error || "อัปเดตไม่สำเร็จ"}`);
+    }
+  } catch (err) {
+    console.error("❌ Update error:", err);
+    setMessage("❌ Server error");
+  }
+};
 
   const handleLogout = () => {
     localStorage.removeItem("auth:token");
@@ -185,8 +211,22 @@ export default function Profile() {
 
                 <div>
                   <label style={{ display: "block", fontSize: "20px", fontWeight: "bold", marginBottom: "6px", textAlign: "left" }}> Email </label>
-                  <input type="email" value={editForm.email} readOnly
-                         style={{ width: "100%", borderRadius: "8px", border: "1px solid #d1d5db", padding: "10px", background: "#f9fafb", color: "#6b7280", fontSize: "16px",}}/>
+                  <input
+  type="email"
+  name="email"
+  value={editForm.email}
+  readOnly // ✅ ป้องกันแก้ไข
+  style={{
+    width: "100%",
+    borderRadius: "8px",
+    border: "1px solid #e5e7eb",
+    padding: "10px",
+    outline: "none",
+    fontSize: "16px",
+    backgroundColor: "#f9fafb", // ✅ ทำให้ดูไม่กดได้
+    color: "#6b7280",
+  }}
+/>
                 </div>
 
                 <div>

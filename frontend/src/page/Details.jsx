@@ -1,11 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
-/** เปลี่ยนได้ตามสภาพแวดล้อม:
- *  - DEV: ตั้ง .env => REACT_APP_API_URL=http://localhost:8080
- *  - PROD: ใช้ URL เซิร์ฟเวอร์จริง
- */
-const API = process.env.REACT_APP_API_URL || "http://localhost:8080";
+
+const API = process.env.REACT_APP_API_URL || "https://badminton-spring-1.onrender.com";
 
 const OPEN_HOUR = 9;
 const CLOSE_HOUR = 21; 

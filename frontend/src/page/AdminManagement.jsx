@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
+const API = process.env.REACT_APP_API_URL || "https://badminton-spring-1.onrender.com";
 
 export default function AdminManagement() {
   const navigate = useNavigate();
