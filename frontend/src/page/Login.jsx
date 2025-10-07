@@ -1,46 +1,52 @@
-
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { FiEye, FiEyeOff } from "react-icons/fi"; 
+import { Link } from "react-router-dom";
+import { FiEye, FiEyeOff } from "react-icons/fi";
 
-const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
+const API = "http://localhost:8080";
 
 export default function Login() {
-
-  const navigate = useNavigate();
-
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPw, setShowPw] = useState(false);
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
     setMessage("");
-
     setLoading(true);
+
     try {
       const res = await fetch(`${API}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = await res.json().catch(() => ({}));
 
-      if (res.ok) {
-        if (data?.token) localStorage.setItem("auth:token", data.token);
-        if (data?.user) localStorage.setItem("auth:user", JSON.stringify(data.user));
-        setMessage("เข้าสู่ระบบสำเร็จ");
-        setForm({ email: "", password: "" });
-        window.dispatchEvent(new Event("auth:changed"));
-        setTimeout(() => navigate("/"), 500);
-      } else {
-        setMessage(`${data?.error || "เข้าสู่ระบบไม่สำเร็จ"}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "เข้าสู่ระบบไม่สำเร็จ");
+        return;
       }
-    } catch {
-      setMessage("Server error");
+
+      // ✅ บันทึก token และ user ลง localStorage
+      localStorage.setItem("auth:token", data.token || ""); // เผื่อไม่มี token
+      localStorage.setItem("auth:user", JSON.stringify(data.user));
+
+      setMessage("เข้าสู่ระบบสำเร็จ ✅");
+      // ไปหน้า /home (หรือหน้าอื่นที่คุณมี)
+      setTimeout(() => {
+        window.location.href = "/home";
+      }, 1000);
+    } catch (err) {
+      console.error("Login failed:", err);
+      setError("เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
     } finally {
       setLoading(false);
     }
@@ -56,21 +62,39 @@ export default function Login() {
           <div style={ui.field}>
             <label htmlFor="email" style={ui.label}>Email</label>
             <div style={ui.inputWrap}>
-              <input id="email" type="email" name="email" style={ui.input}
-                     value={form.email} onChange={handleChange} autoComplete="email" required />
+              <input
+                id="email"
+                type="email"
+                name="email"
+                style={ui.input}
+                value={form.email}
+                onChange={handleChange}
+                autoComplete="email"
+                required
+              />
             </div>
           </div>
 
           <div style={ui.field}>
             <label htmlFor="password" style={ui.label}>Password</label>
             <div style={ui.inputWrap}>
-              <input id="password" type={showPw ? "text" : "password"} name="password" style={ui.input}
-                     value={form.password} onChange={handleChange} autoComplete="current-password" required />
-              
-              <button type="button" style={ui.eyeBtn} 
-                      onClick={() => setShowPw(v => !v)}
-                      aria-label={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"} 
-                      title={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"} >
+              <input
+                id="password"
+                type={showPw ? "text" : "password"}
+                name="password"
+                style={ui.input}
+                value={form.password}
+                onChange={handleChange}
+                autoComplete="current-password"
+                required
+              />
+              <button
+                type="button"
+                style={ui.eyeBtn}
+                onClick={() => setShowPw((v) => !v)}
+                aria-label={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                title={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+              >
                 {showPw ? <FiEyeOff /> : <FiEye />}
               </button>
             </div>
@@ -81,7 +105,8 @@ export default function Login() {
           </button>
         </form>
 
-        {message && <p style={ui.message}>{message}</p>}
+        {error && <p style={{ ...ui.message, color: "red" }}>{error}</p>}
+        {message && <p style={{ ...ui.message, color: "green" }}>{message}</p>}
 
         <p style={ui.helper}>
           ยังไม่มีบัญชี? <Link to="/register" style={ui.link}>สมัครสมาชิก</Link>
@@ -92,7 +117,7 @@ export default function Login() {
 }
 
 const colors = {
-  primary: "#10B981",     
+  primary: "#10B981",
   primaryDark: "#059669",
   ink: "#0f172a",
   muted: "#64748b",
@@ -120,14 +145,12 @@ const ui = {
     border: `1px solid ${colors.line}`,
     borderRadius: 16,
     boxShadow: "0 10px 30px rgba(2,6,12,0.06)",
-    padding: "28px 32px", // ซ้าย-ขวาเท่ากัน
+    padding: "28px 32px",
   },
   title: { margin: 0, fontWeight: 800, color: colors.ink, textAlign: "center" },
   sub: { margin: "6px 0 0 0", color: colors.muted, fontSize: 14, textAlign: "center" },
   field: { marginTop: 16 },
-  label: { display: "block", fontWeight: 600, marginBottom: 6,textAlign: "left" },
-
-  // 🔥 แก้ให้ input และปุ่มตาอยู่ในกล่องเดียวกัน
+  label: { display: "block", fontWeight: 600, marginBottom: 6, textAlign: "left" },
   inputWrap: {
     position: "relative",
     display: "flex",
@@ -138,11 +161,11 @@ const ui = {
   },
   input: {
     flex: 1,
-    padding: "12px 40px 12px 14px", // padding ขวาเว้นที่ให้ icon
-    border: "none",                 // ❌ ไม่ต้องมี border
+    padding: "12px 40px 12px 14px",
+    border: "none",
     outline: "none",
     fontSize: 14,
-    borderRadius: 12,               // ให้เนียนเข้ากับ inputWrap
+    borderRadius: 12,
   },
   eyeBtn: {
     position: "absolute",
