@@ -20,7 +20,7 @@ public class AdminBookingController {
     @Autowired
     private BookingRepository bookingRepo;
 
-    // ✅ แปลงสถานะที่มาจาก frontend ให้เป็นค่ามาตรฐานในระบบ
+    // ✅ แปลงสถานะจาก frontend ให้ตรงกับ backend
     private String normalizeStatus(String raw) {
         String v = String.valueOf(raw == null ? "" : raw).trim().toLowerCase();
         if (v.equals("checked_in") || v.equals("arrived")) return "arrived";
@@ -42,18 +42,20 @@ public class AdminBookingController {
         );
     }
 
-    /** ✅ GET /api/admin/bookings?date=YYYY-MM-DD
-     * คืน { "bookings": [ ... ] }
+    /** ✅ GET /api/admin/bookings
+     *    - ถ้าไม่ส่ง date → คืนทั้งหมด
+     *    - ถ้าส่ง date=YYYY-MM-DD → คืนเฉพาะวันนั้น
      */
     @GetMapping("")
-    public ResponseEntity<?> listByDate(@RequestParam String date) {
-        if (date == null || !date.matches("\\d{4}-\\d{2}-\\d{2}")) {
-            return ResponseEntity.badRequest().body(Map.of("error", "ต้องส่ง date รูปแบบ YYYY-MM-DD"));
-        }
+    public ResponseEntity<?> listBookings(@RequestParam(required = false) String date) {
+        List<Booking> list;
 
-        // ดึงทั้งหมด (รวม canceled) และเรียงเพื่อให้ UI แสดงสวยงาม
-        List<Booking> list = bookingRepo.findByDateOrderByCourtAscHourAsc(date);
-        if (list == null) list = bookingRepo.findByDate(date);
+        if (date != null && date.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            list = bookingRepo.findByDateOrderByCourtAscHourAsc(date);
+            if (list == null) list = bookingRepo.findByDate(date);
+        } else {
+            list = bookingRepo.findAll();
+        }
 
         List<AdminBookingItem> items = list.stream()
                 .map(this::toAdminItem)
@@ -64,7 +66,6 @@ public class AdminBookingController {
 
     /** ✅ PUT /api/admin/bookings/{id}/status
      * body: { "status": "checked_in" | "arrived" | "booked" | "canceled" }
-     * คืน { message, booking }
      */
     @PutMapping("/{id}/status")
     public ResponseEntity<?> updateStatus(@PathVariable String id, @RequestBody UpdateStatusRequest req) {

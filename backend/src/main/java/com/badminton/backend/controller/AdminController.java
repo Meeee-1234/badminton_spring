@@ -1,7 +1,8 @@
 package com.badminton.backend.controller;
 
-import com.badminton.backend.model.Booking;
-import com.badminton.backend.repository.BookingRepository;
+import com.badminton.backend.model.User;
+import com.badminton.backend.repository.UserRepository;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -9,58 +10,27 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/admin")
+@RequestMapping("/api/admin/users")
 @CrossOrigin(origins = "*")
 public class AdminController {
 
     @Autowired
-    private BookingRepository bookingRepo;
+    private UserRepository userRepo;
 
-    // ✅ ดึง booking ตามวัน (admin เท่านั้น)
-    @GetMapping("/bookings/date")
-    public ResponseEntity<?> listByDate(@RequestParam String date) {
-        System.out.println("🔍 Admin ดู booking ในวันที่ = " + date);
-
-        List<Booking> bookings = bookingRepo.findByDate(date);
-
-        List<Map<String, Object>> result = bookings.stream().map(b -> Map.of(
-                "_id", b.getId(),
-                "user", Map.of(
-                        "_id", b.getUser().getId(),
-                        "name", b.getUser().getName()
-                ),
-                "date", b.getDate(),
-                "court", b.getCourt(),
-                "hour", b.getHour(),
-                "status", b.getStatus()
-        )).toList();
-
-        return ResponseEntity.ok(Map.of("bookings", result));
+    // ✅ ดึงผู้ใช้ทั้งหมด
+    @GetMapping("")
+    public ResponseEntity<?> getAllUsers() {
+        List<User> users = userRepo.findAll();
+        return ResponseEntity.ok(Map.of("users", users));
     }
 
-    @GetMapping("/bookings")
-public ResponseEntity<?> getAllBookings(@RequestParam(required = false) String date) {
-    List<Booking> bookings;
-
-    if (date != null && !date.isBlank()) {
-        bookings = bookingRepo.findByDate(date);
-    } else {
-        bookings = bookingRepo.findAll();
+    // ✅ ลบผู้ใช้ตาม id
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteUser(@PathVariable String id) {
+        if (!userRepo.existsById(id)) {
+            return ResponseEntity.status(404).body(Map.of("error", "ไม่พบผู้ใช้"));
+        }
+        userRepo.deleteById(id);
+        return ResponseEntity.ok(Map.of("message", "ลบผู้ใช้เรียบร้อยแล้ว"));
     }
-
-    List<Map<String, Object>> result = bookings.stream().map(b -> Map.of(
-        "_id", b.getId(),
-        "user", Map.of(
-            "_id", b.getUser().getId(),
-            "name", b.getUser().getName()
-        ),
-        "date", b.getDate(),
-        "court", b.getCourt(),
-        "hour", b.getHour(),
-        "status", b.getStatus()
-    )).toList();
-
-    return ResponseEntity.ok(Map.of("bookings", result));
-}
-
 }
