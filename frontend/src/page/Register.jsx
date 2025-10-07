@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 
-const API = process.env.REACT_APP_API_URL || "http://localhost:8080";
+const API = process.env.REACT_APP_API_URL || "https://badminton-spring.onrender.com/";
 
 export default function Register() {
   const navigate = useNavigate();

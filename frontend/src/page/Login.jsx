@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 
-const API = "http://localhost:8080";
+const API = process.env.REACT_APP_API_URL || "https://badminton-spring.onrender.com/";
 
 export default function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -43,7 +43,7 @@ export default function Login() {
       setMessage("เข้าสู่ระบบสำเร็จ ✅");
       // ไปหน้า /home (หรือหน้าอื่นที่คุณมี)
       setTimeout(() => {
-        window.location.href = "/home";
+        window.location.href = "/";
       }, 1000);
     } catch (err) {
       console.error("Login failed:", err);
