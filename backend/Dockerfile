@@ -1,15 +1,23 @@
-FROM eclipse-temurin:21-jdk
+# ---------- Build Stage ----------
+FROM eclipse-temurin:21-jdk AS build
 
 WORKDIR /app
 
-# copy ไฟล์สำหรับ build
-COPY mvnw .
-COPY pom.xml .
 COPY .mvn .mvn
-COPY src src
+COPY mvnw pom.xml ./
 
 RUN chmod +x mvnw
 RUN ./mvnw clean package -DskipTests
 
-# ใช้ absolute path ไปเลย
-CMD ["java", "-jar", "/app/target/backend-0.0.1-SNAPSHOT.jar"]
+COPY src ./src
+RUN ./mvnw package -DskipTests
+
+
+# ---------- Runtime Stage ----------
+FROM eclipse-temurin:21-jdk
+
+WORKDIR /app
+
+COPY --from=build /app/target/backend-0.0.1-SNAPSHOT.jar app.jar
+
+CMD ["java", "-jar", "app.jar"]
