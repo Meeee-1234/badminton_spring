@@ -30,7 +30,9 @@ public class AdminBookingController {
     }
 
     private AdminBookingItem toAdminItem(Booking b) {
-        String userName = (b.getUser() != null && b.getUser().getName() != null) ? b.getUser().getName() : "-";
+        String userName = (b.getUser() != null && b.getUser().getName() != null) 
+            ? b.getUser().getName() 
+            : "-";
         return new AdminBookingItem(
                 b.getId(),
                 b.getDate(),
@@ -42,10 +44,7 @@ public class AdminBookingController {
         );
     }
 
-    /** ✅ GET /api/admin/bookings
-     *    - ถ้าไม่ส่ง date → คืนทั้งหมด
-     *    - ถ้าส่ง date=YYYY-MM-DD → คืนเฉพาะวันนั้น
-     */
+    /** ✅ GET /api/admin/bookings */
     @GetMapping("")
     public ResponseEntity<?> listBookings(@RequestParam(required = false) String date) {
         List<Booking> list;
@@ -64,29 +63,22 @@ public class AdminBookingController {
         return ResponseEntity.ok(Map.of("bookings", items));
     }
 
-    /** ✅ PUT /api/admin/bookings/{id}/status
-     * body: { "status": "checked_in" | "arrived" | "booked" | "canceled" }
-     */
+    /** ✅ PUT /api/admin/bookings/{id}/status */
     @PutMapping("/{id}/status")
     public ResponseEntity<?> updateStatus(@PathVariable String id, @RequestBody UpdateStatusRequest req) {
-        try {
-            Optional<Booking> opt = bookingRepo.findById(id);
-            if (opt.isEmpty()) {
-                return ResponseEntity.status(404).body(Map.of("error", "ไม่พบรายการจอง"));
-            }
-            Booking b = opt.get();
-
-            String newStatus = normalizeStatus(req.getStatus());
-            b.setStatus(newStatus);
-            Booking saved = bookingRepo.save(b);
-
-            return ResponseEntity.ok(Map.of(
-                    "message", "อัพเดตสถานะสำเร็จ",
-                    "booking", toAdminItem(saved)
-            ));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(Map.of("error", "Server error", "detail", e.getMessage()));
+        Optional<Booking> opt = bookingRepo.findById(id);
+        if (opt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("error", "ไม่พบการจอง"));
         }
+
+        Booking booking = opt.get();
+        String newStatus = normalizeStatus(req.getStatus());
+        booking.setStatus(newStatus);
+        Booking saved = bookingRepo.save(booking);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "อัปเดตสถานะสำเร็จ",
+                "booking", toAdminItem(saved)
+        ));
     }
 }

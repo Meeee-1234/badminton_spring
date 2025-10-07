@@ -1,5 +1,5 @@
-
-import React, { useEffect, useState } from "react";
+// src/pages/AdminManagement.jsx
+import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API = process.env.REACT_APP_API_URL || "https://badminton-spring-1.onrender.com";
@@ -14,6 +14,27 @@ export default function AdminManagement() {
   const [searchKeyword, setSearchKeyword] = useState("");
   const [searchDate, setSearchDate] = useState("");
   
+
+  // ===== Helpers =====
+  const isAdmin = (role) => !!String(role || "").match(/admin/i);
+  const idOf = (obj) => obj?.id ?? obj?._id ?? obj?.userId ?? null;
+
+  const normalizeUsers = (data) => {
+    const list = Array.isArray(data) ? data : (data?.users ?? data?.data ?? []);
+    return Array.isArray(list) ? list : [];
+  };
+  const normalizeBookings = (data) => {
+    const list = Array.isArray(data) ? data : (data?.bookings ?? data?.data ?? []);
+    return Array.isArray(list) ? list : [];
+  };
+
+  const safeJson = async (res) => {
+    const text = await res.text();
+    try { return JSON.parse(text); }
+    catch { throw new Error(`Response is not JSON: ${text.slice(0, 200)}`); }
+  };
+
+  // ===== Actions =====
   const handleLogout = () => {
     localStorage.removeItem("auth:token");
     localStorage.removeItem("auth:user");
@@ -24,97 +45,115 @@ export default function AdminManagement() {
     if (!window.confirm("คุณแน่ใจหรือไม่ที่จะลบผู้ใช้นี้?")) return;
 
     const token = localStorage.getItem("auth:token");
+    if (!token) { alert("ไม่มี token"); return; }
+
+    const uid = encodeURIComponent(id);
     try {
-      const res = await fetch(`${API}/api/admin/users/${id}`, {
+      const res = await fetch(`${API}/api/admin/users/${uid}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const text = await res.text();
-      console.log("Raw response:", text);
-
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (err) {
-        throw new Error("Response is not JSON: " + text.substring(0, 100));
-      }
-
+      const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || "ลบผู้ใช้ไม่สำเร็จ");
 
-      setUsers((prev) => prev.filter((u) => u._id !== id));
-      alert(" " + data.message);
+      setUsers((prev) => prev.filter((u) => idOf(u) !== id));
+      alert(data.message || "ลบสำเร็จ");
     } catch (err) {
       console.error("Delete user error:", err);
-      alert(" " + err.message);
+      alert("ผิดพลาด: " + err.message);
     }
   };
 
+  // ===== Fetch =====
   useEffect(() => {
-  const token = localStorage.getItem("auth:token");
-  const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
+    const token = localStorage.getItem("auth:token");
+    const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
 
-  if (!token || user.role !== "admin") {
-    alert("คุณไม่มีสิทธิ์การเข้าถึงหน้านี้ (Admin เท่านั้น)");
-    navigate("/");
-    return;
-  }
+    console.log("AdminManagement token?", token ? `${token.slice(0, 10)}...` : "(none)");
+    console.log("AdminManagement role =", user.role);
 
-  async function fetchData() {
-    try {
-      const [userRes, bookingRes] = await Promise.all([
-        fetch(`${API}/api/admin/users`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`${API}/api/admin/bookings/date?date=${searchDate}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-      ]);
-
-      if (!userRes.ok || !bookingRes.ok) throw new Error("โหลดข้อมูลไม่สำเร็จ");
-
-      const [userData, bookingData] = await Promise.all([
-        userRes.json(),
-        bookingRes.json(),
-      ]);
-
-      const filteredUsers = (userData.users || []).filter((u) => u.role !== "admin");
-      setUsers(filteredUsers);
-      setBookings(bookingData.bookings || []);
-    } catch (err) {
-      console.error("โหลดข้อมูลล้มเหลว:", err);
-      setMessage("โหลดข้อมูลไม่สำเร็จ");
-    } finally {
-      setLoading(false);
+    if (!token || !isAdmin(user.role)) {
+      alert("คุณไม่มีสิทธิ์การเข้าถึงหน้านี้ (Admin เท่านั้น)");
+      navigate("/");
+      return;
     }
-  }
 
-  fetchData();
-}, [navigate, searchDate]);
+    async function fetchData() {
+      setLoading(true);
+      setMessage("");
+      try {
+        const qs = searchDate ? `?date=${encodeURIComponent(searchDate)}` : "";
+        const [userRes, bookingRes] = await Promise.all([
+          fetch(`${API}/api/admin/users`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API}/api/admin/bookings${qs}`, { headers: { Authorization: `Bearer ${token}` } }),
+        ]);
 
-const filteredBookings = bookings.filter((b) => {
-  const keyword = searchKeyword.toLowerCase();
-  return (
-    (b.user?.name || "").toLowerCase().includes(keyword) ||
-    (b.date || "").toLowerCase().includes(keyword) ||
-    (b.court || "").toString().includes(keyword) ||
-    (b.status || "").toLowerCase().includes(keyword)
-  );
-});
+        console.log("[admin/users] status =", userRes.status, userRes.statusText);
+        console.log("[admin/bookings] status =", bookingRes.status, bookingRes.statusText);
 
+        if (!userRes.ok) {
+          const body = await userRes.text();
+          const snippet = body ? body.slice(0, 200) : "(empty)";
+          throw new Error(`โหลด users ไม่สำเร็จ: [${userRes.status}] ${userRes.statusText} :: ${snippet}`);
+        }
+        if (!bookingRes.ok) {
+          const body = await bookingRes.text();
+          const snippet = body ? body.slice(0, 200) : "(empty)";
+          throw new Error(`โหลด bookings ไม่สำเร็จ: [${bookingRes.status}] ${bookingRes.statusText} :: ${snippet}`);
+        }
 
+        const [userData, bookingData] = await Promise.all([userRes.json(), bookingRes.json()]);
+        const normalizedUsers = normalizeUsers(userData).filter((u) => !isAdmin(u.role));
+        const normalizedBookings = normalizeBookings(bookingData);
+
+        console.log("✅ users:", normalizedUsers);
+        console.log("✅ bookings:", normalizedBookings);
+
+        setUsers(normalizedUsers);
+        setBookings(normalizedBookings);
+      } catch (err) {
+        console.error("โหลดข้อมูลล้มเหลว:", err);
+        setMessage("โหลดข้อมูลไม่สำเร็จ: " + err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [navigate, searchDate]);
+
+  // ===== Filters =====
+  const filteredBookings = useMemo(() => {
+    const keyword = searchKeyword.trim().toLowerCase();
+    if (!keyword) return bookings;
+    return bookings.filter((b) => {
+      const name = (b.user?.name || "").toLowerCase();
+      const date = (b.date || "").toLowerCase();
+      const court = String(b.court ?? "").toLowerCase();
+      const status = (b.status || "").toLowerCase();
+      return name.includes(keyword) || date.includes(keyword) || court.includes(keyword) || status.includes(keyword);
+    });
+  }, [bookings, searchKeyword]);
+
+  // ===== UI =====
   return (
     <div style={{ padding: 20, fontFamily: "Segoe UI, sans-serif", background: "#f9fafb", minHeight: "100vh" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <button onClick={() => navigate("/")} style={{ padding: "8px 16px", borderRadius: 12, border: "1px solid #d1d5db", background: "#fff", color: "#0f172a", fontWeight: 600 }}> ← กลับหน้าแรก </button>
- 
+        <button onClick={() => navigate("/")} style={{ padding: "8px 16px", borderRadius: 12, border: "1px solid #d1d5db", background: "#fff", color: "#0f172a", fontWeight: 600 }}>
+          ← กลับหน้าแรก
+        </button>
+
         <h1 style={{ fontSize: 28, fontWeight: 800 }}>📊 Admin Management</h1>
-        <button onClick={handleLogout} style={{ background: "#ef4444", color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>🚪 Logout</button>
+        <button onClick={handleLogout} style={{ background: "#ef4444", color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>
+          🚪 Logout
+        </button>
       </div>
 
-      {/* Flash Message */}
       {message && (
-        <div style={{ background: "#fef3c7", color: "#92400e", padding: "10px 14px", borderRadius: 8, marginTop: 16 }}> {message}</div>
+        <div style={{ background: "#fef3c7", color: "#92400e", padding: "10px 14px", borderRadius: 8, marginTop: 16 }}>
+          {message}
+        </div>
       )}
 
       {/* Users */}
@@ -132,23 +171,32 @@ const filteredBookings = bookings.filter((b) => {
               </tr>
             </thead>
             <tbody>
-              {users.length > 0 ? (
-                users.map((u, index) => (
-                  <tr key={u._id}>
-                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{index + 1}</td>
-                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u.name}</td>
-                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u.email}</td>
-                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u.phone || "-"}</td>
-                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
-                      <button onClick={() => handleDeleteUser(u._id)} 
-                       style={{ background: "#ef4444", color: "#fff", border: "none", padding: "6px 12px", borderRadius: 6, fontWeight: 600, cursor: "pointer" }}>🗑 Delete</button>
-                    </td>
-                  </tr>
-                ))
+              {loading ? (
+                <tr><td colSpan={5} style={{ textAlign: "center", padding: 16 }}>กำลังโหลด...</td></tr>
+              ) : users.length > 0 ? (
+                users.map((u, index) => {
+                  const uid = idOf(u);
+                  return (
+                    <tr key={uid || index}>
+                      <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{index + 1}</td>
+                      <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u.name}</td>
+                      <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u.email}</td>
+                      <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u.phone || "-"}</td>
+                      <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
+                        <button
+                          onClick={() => handleDeleteUser(uid)}
+                          disabled={!uid}
+                          style={{ background: "#ef4444", color: "#fff", border: "none", padding: "6px 12px", borderRadius: 6, fontWeight: 600, cursor: "pointer", opacity: uid ? 1 : 0.5 }}
+                          title={uid ? "ลบผู้ใช้" : "ไม่พบ ID ผู้ใช้"}
+                        >
+                          🗑 Delete
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: "center", color: "#9ca3af", padding: 10 }}> ไม่มีข้อมูลผู้ใช้ </td>
-                </tr>
+                <tr><td colSpan={5} style={{ textAlign: "center", color: "#9ca3af", padding: 10 }}>ไม่มีข้อมูลผู้ใช้</td></tr>
               )}
             </tbody>
           </table>
@@ -159,54 +207,54 @@ const filteredBookings = bookings.filter((b) => {
       <section style={{ marginBottom: 40 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>📝 Bookings</h2>
 
-        {/* Search */}
-        {/* 🔍 Search by keyword */}
-<input
-  type="text"
-  placeholder="🔍 ค้นหา Booking (ชื่อ, คอร์ท, สถานะ)"
-  value={searchKeyword}
-  onChange={(e) => setSearchKeyword(e.target.value)}
-  style={{ marginBottom: 12, padding: "8px 12px", width: "100%", maxWidth: 350, border: "1px solid #d1d5db", borderRadius: 8 }}
-/>
-
-{/* 📅 Search by date */}
-<input
-  type="date"
-  value={searchDate}
-  onChange={(e) => setSearchDate(e.target.value)}
-  style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: 8 }}
-/>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+          <input
+            type="text"
+            placeholder="🔍 ค้นหา Booking (ชื่อ, คอร์ต, สถานะ)"
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            style={{ padding: "8px 12px", width: "100%", maxWidth: 350, border: "1px solid #d1d5db", borderRadius: 8 }}
+          />
+          <input
+            type="date"
+            value={searchDate}
+            onChange={(e) => setSearchDate(e.target.value)}
+            style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: 8 }}
+          />
+        </div>
 
         <div style={{ overflowX: "auto", background: "#fff", borderRadius: 10, boxShadow: "0 4px 10px rgba(0,0,0,0.05)" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
                 {["ID", "User", "Date", "Court", "Hour", "Status"].map((h) => (
-                <th key={h} style={{ padding: 12, background: "#10b981", color: "#fff", textAlign: "center", fontWeight: 600 }}>{h}</th> ))}
+                  <th key={h} style={{ padding: 12, background: "#10b981", color: "#fff", textAlign: "center", fontWeight: 600 }}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-                {filteredBookings.length > 0 ? (
+              {loading ? (
+                <tr><td colSpan={6} style={{ textAlign: "center", padding: 16 }}>กำลังโหลด...</td></tr>
+              ) : filteredBookings.length > 0 ? (
                 filteredBookings.map((b, index) => (
-                  <tr key={b._id}>
+                  <tr key={b._id || `${b.date}-${b.court}-${b.hour}-${index}`}>
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>{index + 1}</td>
-                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>{b.user?.name || "-"}</td>
+                    <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>{b.user?.name || b.userName || "-"}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>{b.date}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>{b.court}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>{`${b.hour}:00 - ${b.hour + 1}:00`}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb", textAlign: "center" }}>
-                      <span style={{ display: "inline-block", padding: "4px 10px", borderRadius: 12, fontWeight: 600, textAlign: "center", minWidth: 60,
-                      backgroundColor:
-                      b.status === "booked" ? "#bfdbfe" : 
-                      b.status === "arrived" ? "#bbf7d0" : 
-                      b.status === "canceled" ? "#fecaca" :
-                        "#e5e7eb", 
-                      color:
-                      b.status === "booked" ? "#1e3a8a" :
-                      b.status === "arrived" ? "#065f46" :
-                      b.status === "canceled" ? "#7f1d1d" :
-                        "#374151",
-                       }}>
+                      <span style={{
+                        display: "inline-block", padding: "4px 10px", borderRadius: 12, fontWeight: 600, textAlign: "center", minWidth: 60,
+                        backgroundColor:
+                          b.status === "booked" ? "#bfdbfe" :
+                          b.status === "arrived" ? "#bbf7d0" :
+                          b.status === "canceled" ? "#fecaca" : "#e5e7eb",
+                        color:
+                          b.status === "booked" ? "#1e3a8a" :
+                          b.status === "arrived" ? "#065f46" :
+                          b.status === "canceled" ? "#7f1d1d" : "#374151",
+                      }}>
                         {b.status === "booked" && "จองแล้ว"}
                         {b.status === "arrived" && "มาแล้ว"}
                         {b.status === "canceled" && "ยกเลิก"}
@@ -216,11 +264,7 @@ const filteredBookings = bookings.filter((b) => {
                   </tr>
                 ))
               ) : (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: "center", color: "#9ca3af", padding: 10 }}>
-                    ไม่มีข้อมูลการจอง
-                  </td>
-                </tr>
+                <tr><td colSpan={6} style={{ textAlign: "center", color: "#9ca3af", padding: 10 }}>ไม่มีข้อมูลการจอง</td></tr>
               )}
             </tbody>
           </table>

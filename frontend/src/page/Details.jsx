@@ -150,8 +150,8 @@ export default function Details() {
 
       const [tRes, mRes] = await Promise.all([
         fetch(ENDPOINTS.taken(dateKey), { cache: "no-store" }),
-        user?._id
-          ? fetch(ENDPOINTS.mine(dateKey, user._id), { cache: "no-store" }).catch(() => null)
+        user?.id
+          ? fetch(ENDPOINTS.mine(dateKey, user.id), { cache: "no-store" }).catch(() => null)
           : Promise.resolve(null),
       ]);
 
@@ -218,7 +218,7 @@ const handleConfirm = async () => {
   try {
     const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
 
-    if (!user?._id) {
+    if (!user?.id) {
       setMsg("❌ กรุณาเข้าสู่ระบบก่อนจอง");
       setLoading(false);
       return;
@@ -231,7 +231,7 @@ const handleConfirm = async () => {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          userId: user._id,     // ✅ ต้องมี userId ใน body
+          userId: user.id,     // ✅ ต้องมี userId ใน body
           date: dateKey,
           court: s.court,
           hour: s.hour,

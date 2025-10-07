@@ -109,4 +109,17 @@ public ResponseEntity<?> createBooking(@RequestBody Map<String, Object> req) {
 }
 
 
+
+
+
+
+
+// ✅ ดึงการจองทั้งหมด
+@GetMapping("")
+public ResponseEntity<?> getAllBookings() {
+    List<Booking> bookings = bookingRepo.findAll();
+    return ResponseEntity.ok(Map.of("bookings", bookings));
+}
+
+
 }

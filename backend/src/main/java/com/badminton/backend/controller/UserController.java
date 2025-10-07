@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -18,6 +19,20 @@ public class UserController {
 
     @Autowired
     private UserRepository userRepo;
+
+
+
+    // ✅ ดึงผู้ใช้ทั้งหมด
+    @GetMapping("")
+    public ResponseEntity<?> getAllUsers() {
+        List<User> users = userRepo.findAll();
+        return ResponseEntity.ok(Map.of("users", users));
+    }
+
+
+
+
+    
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User user) {
@@ -73,7 +88,6 @@ public class UserController {
         }
     }
 
-        
 
 
 }

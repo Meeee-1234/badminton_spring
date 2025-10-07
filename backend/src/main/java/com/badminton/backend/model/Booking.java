@@ -18,6 +18,7 @@ public class Booking {
     private String status; // booked, arrived, canceled
     private String note;
 
+
     public Booking() {}
 
     public Booking(User user, String date, int court, int hour, String status, String note) {

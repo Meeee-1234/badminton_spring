@@ -2,8 +2,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API =
-  process.env.REACT_APP_API_URL || "https://badminton-spring-1.onrender.com";
+const API = "http://localhost:8080";
 
 const C = {
   bg: "#f6fef8",
@@ -179,39 +178,41 @@ export default function AdminDetails() {
     return map;
   }, [filtered]);
 
-  const setStatus = async (id, status) => {
-    try {
-      const token = localStorage.getItem("auth:token");
-      const res = await fetch(ENDPOINTS.setStatus(id), {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status }),
-      });
+const setStatus = async (id, status) => {
+  try {
+    const token = localStorage.getItem("auth:token");
+    const res = await fetch(`${ENDPOINTS.setStatus(id)}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ status }),
+    });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "อัพเดตสถานะล้มเหลว");
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || "อัพเดตสถานะล้มเหลว");
 
-      const newStatus = normalizeStatus(status);
+    const newStatus = normalizeStatus(status);
 
-      if (newStatus === "canceled") {
-        setBookings((prev) => prev.filter((b) => b._id !== id));
-        setMsg("ยกเลิกแล้ว ช่องนี้ว่างให้คนอื่นจองได้");
-      } else {
-        setBookings((prev) =>
-          prev.map((b) => (b._id === id ? { ...b, status: newStatus } : b))
-        );
-        setMsg("อัพเดตสถานะสำเร็จ");
-      }
-
-      emitUpdate(dateKey);
-    } catch (err) {
-      setMsg(" " + (err.message || String(err)));
-      console.error(err);
+    if (newStatus === "canceled") {
+      setBookings((prev) => prev.filter((b) => b._id !== id));
+      setMsg("ยกเลิกแล้ว ช่องนี้ว่างให้คนอื่นจองได้");
+    } else {
+      setBookings((prev) =>
+        prev.map((b) => (b._id === id ? { ...b, status: newStatus } : b))
+      );
+      setMsg("อัพเดตสถานะสำเร็จ");
     }
-  };
+
+    emitUpdate(dateKey);
+  } catch (err) {
+    setMsg(" " + (err.message || String(err)));
+    console.error(err);
+  }
+};
+
+
 
   return (
     <div style={sx.page}>

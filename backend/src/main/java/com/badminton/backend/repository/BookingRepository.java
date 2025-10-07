@@ -17,4 +17,5 @@ public interface BookingRepository extends MongoRepository<Booking, String> {
     // ✅ เพิ่มเมธอดสำหรับหน้า Admin
     List<Booking> findByDate(String date);
     List<Booking> findByDateOrderByCourtAscHourAsc(String date);
+    
 }
