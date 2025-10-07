@@ -20,21 +20,13 @@ public class SecurityConfig {
             .csrf(cs -> cs.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // ✅ allow preflight
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                // ✅ public APIs
-                .requestMatchers("/api/**").permitAll()
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/users/**").permitAll()
-                .requestMatchers("/api/profile/**").permitAll()
-                .requestMatchers("/api/bookings/**").permitAll()
+                // ✅ ให้ทุก API เข้าถึงได้ (แม้ /api/admin/**)
+                .requestMatchers("/**").permitAll()
 
-                // ✅ admin only
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
-
-                // other require login
-                .anyRequest().authenticated()
+                // ❌ อย่าใช้ hasRole ถ้ายังไม่มีระบบ Auth
+                .anyRequest().permitAll()
             );
 
         return http.build();
