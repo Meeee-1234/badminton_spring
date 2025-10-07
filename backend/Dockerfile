@@ -1,17 +1,17 @@
-FROM eclipse-temurin:21-jdk
+FROM eclipse-temurin:21-jdk AS build
 
 WORKDIR /app
 
-COPY mvnw .
-COPY pom.xml .
 COPY .mvn .mvn
-COPY src src
+COPY mvnw pom.xml ./
+COPY src ./src
 
-RUN chmod +x mvnw
 RUN ./mvnw clean package -DskipTests
 
-# ✅ สำคัญ: ให้สิทธิ์กับ JAR (แม้จะไม่รันตรง ๆ แต่ให้แน่ใจว่า read ได้)
-RUN chmod 755 target/backend-0.0.1-SNAPSHOT.jar
+# -------------------------------
+FROM eclipse-temurin:21-jdk
+WORKDIR /app
 
-# ✅ ชัดเจน: สั่งให้ Java เป็นคนรัน JAR
-CMD ["java", "-jar", "target/backend-0.0.1-SNAPSHOT.jar"]
+COPY --from=build /app/target/backend-0.0.1-SNAPSHOT.jar app.jar
+
+CMD ["java", "-jar", "app.jar"]
