@@ -2,7 +2,6 @@ package com.badminton.backend.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -12,13 +11,13 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.disable()) // ❌ ปิด CSRF สำหรับ API
+            .csrf(csrf -> csrf.disable()) // ❗ ปิด CSRF
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll() // ✅ ให้ register / login ผ่านได้
-                .anyRequest().authenticated()
-            )
-            .httpBasic(Customizer.withDefaults()); // ✅ หรือใช้ formLogin() ก็ได้
+                .requestMatchers("/api/auth/**").permitAll() // ✅ อนุญาตให้ทุกคนเข้าถึง /api/auth/*
+                .requestMatchers("/api/users/**").permitAll()
+                .anyRequest().authenticated() // 🔒 อื่น ๆ ต้อง login
+            );
 
-        return http.build();
+        return http.build(); // ✅ build โดยไม่ต้องใช้ httpBasic หรือ formLogin
     }
 }

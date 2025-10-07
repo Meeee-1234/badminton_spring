@@ -7,6 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.Map; // ✅ สำคัญ
+// ⬆️ เพิ่มบรรทัดนี้!
 
 @RestController
 @RequestMapping("/api")
@@ -27,4 +29,12 @@ public class UserController {
         User saved = userRepo.save(user);
         return ResponseEntity.ok(saved);
     }
+
+    @GetMapping("/users/{id}")
+    public ResponseEntity<?> getUserById(@PathVariable String id) {
+        return userRepo.findById(id)
+                .<ResponseEntity<?>>map(user -> ResponseEntity.ok(user))
+                .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "ไม่พบผู้ใช้")));
+    }
+
 }

@@ -1,15 +1,19 @@
-
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 
-const API = process.env.REACT_APP_API_URL || "https://badminton-mongo.onrender.com";
+const API = process.env.REACT_APP_API_URL || "http://localhost:8080";
 
 export default function Register() {
-
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({ name: "", email: "", phone: "", password: "" });
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "" // ✅ เพิ่ม
+  });
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [message, setMessage] = useState("");
@@ -33,21 +37,20 @@ export default function Register() {
 
     setLoading(true);
     try {
+      const { name, email, phone, password } = form; // ✅ ส่งเฉพาะ field ที่ backend ใช้
+      const payload = { name, email, phone, password };
+
       const res = await fetch(`${API}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
 
-      console.log("API URL:", `${API}/api/auth/register`);
-      console.log("Response status:", res.status);
-
       const data = await res.json().catch(() => ({}));
-      console.log("Response body:", data);
 
       if (res.ok) {
         setMessage("สมัครสมาชิกสำเร็จ");
-        setForm({ name: "", email: "", phone: "", password: "" });
+        setForm({ name: "", email: "", phone: "", password: "", confirmPassword: "" });
         setTimeout(() => navigate("/login"), 700);
       } else {
         setMessage(`${data?.error || "สมัครสมาชิกไม่สำเร็จ"}`);
@@ -58,7 +61,6 @@ export default function Register() {
       setLoading(false);
     }
   };
-
   return (
     <div style={ui.page}>
       <div style={ui.card}>
