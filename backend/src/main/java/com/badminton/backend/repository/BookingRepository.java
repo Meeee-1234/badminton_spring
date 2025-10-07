@@ -13,4 +13,8 @@ public interface BookingRepository extends MongoRepository<Booking, String> {
     List<Booking> findByUserId(String userId);
     List<Booking> findByUserIdAndDateAndStatusIn(String userId, String date, List<String> status);
     Optional<Booking> findByDateAndCourtAndHourAndStatusIn(String date, int court, int hour, List<String> status);
+
+    // ✅ เพิ่มเมธอดสำหรับหน้า Admin
+    List<Booking> findByDate(String date);
+    List<Booking> findByDateOrderByCourtAscHourAsc(String date);
 }

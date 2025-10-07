@@ -11,7 +11,8 @@ export default function AdminManagement() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-  const [searchTerm, setSearchTerm] = useState(""); 
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [searchDate, setSearchDate] = useState("");
   
   const handleLogout = () => {
     localStorage.removeItem("auth:token");
@@ -50,57 +51,57 @@ export default function AdminManagement() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("auth:token");
-    const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
+  const token = localStorage.getItem("auth:token");
+  const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
 
-    if (!token || user.role !== "admin") {
-      alert("คุณไม่มีสิทธิ์การเข้าถึงหน้านี้ (Admin เท่านั้น)");
-      navigate("/"); 
-      return;
+  if (!token || user.role !== "admin") {
+    alert("คุณไม่มีสิทธิ์การเข้าถึงหน้านี้ (Admin เท่านั้น)");
+    navigate("/");
+    return;
+  }
+
+  async function fetchData() {
+    try {
+      const [userRes, bookingRes] = await Promise.all([
+        fetch(`${API}/api/admin/users`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API}/api/admin/bookings/date?date=${searchDate}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+
+      if (!userRes.ok || !bookingRes.ok) throw new Error("โหลดข้อมูลไม่สำเร็จ");
+
+      const [userData, bookingData] = await Promise.all([
+        userRes.json(),
+        bookingRes.json(),
+      ]);
+
+      const filteredUsers = (userData.users || []).filter((u) => u.role !== "admin");
+      setUsers(filteredUsers);
+      setBookings(bookingData.bookings || []);
+    } catch (err) {
+      console.error("โหลดข้อมูลล้มเหลว:", err);
+      setMessage("โหลดข้อมูลไม่สำเร็จ");
+    } finally {
+      setLoading(false);
     }
+  }
 
-    async function fetchData() {
-      try {
-        const [userRes, bookingRes] = await Promise.all([
-          fetch(`${API}/api/admin/users`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${API}/api/admin/bookings`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ]);
+  fetchData();
+}, [navigate, searchDate]);
 
-        if (!userRes.ok || !bookingRes.ok) throw new Error("โหลดข้อมูลไม่สำเร็จ");
+const filteredBookings = bookings.filter((b) => {
+  const keyword = searchKeyword.toLowerCase();
+  return (
+    (b.user?.name || "").toLowerCase().includes(keyword) ||
+    (b.date || "").toLowerCase().includes(keyword) ||
+    (b.court || "").toString().includes(keyword) ||
+    (b.status || "").toLowerCase().includes(keyword)
+  );
+});
 
-        const [userData, bookingData] = await Promise.all([
-          userRes.json(),
-          bookingRes.json(),
-        ]);
-
-        const filteredUsers = (userData.users || []).filter((u) => u.role !== "admin");
-        setUsers(filteredUsers);
-        setBookings(bookingData.bookings || []);
-      } catch (err) {
-        console.error("โหลดข้อมูลล้มเหลว:", err);
-        setMessage("โหลดข้อมูลไม่สำเร็จ");
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-  }, [navigate]);
-
-  if (loading) return <p>⏳ กำลังโหลด...</p>;
-
-  const filteredBookings = bookings.filter((b) => {
-    const keyword = searchTerm.toLowerCase();
-    return (
-      (b.user?.name || "").toLowerCase().includes(keyword) ||
-      (b.date || "").toLowerCase().includes(keyword) ||
-      (b.court || "").toString().includes(keyword) ||
-      (b.status || "").toLowerCase().includes(keyword)
-    );
-  });
 
   return (
     <div style={{ padding: 20, fontFamily: "Segoe UI, sans-serif", background: "#f9fafb", minHeight: "100vh" }}>
@@ -159,12 +160,23 @@ export default function AdminManagement() {
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>📝 Bookings</h2>
 
         {/* Search */}
-        <input type="text" placeholder="🔍 ค้นหา Booking (ชื่อ, คอร์ท, สถานะ)" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-          style={{marginBottom: 12,padding: "8px 12px", width: "100%", maxWidth: 350, border: "1px solid #d1d5db", borderRadius: 8, }}/>
+        {/* 🔍 Search by keyword */}
+<input
+  type="text"
+  placeholder="🔍 ค้นหา Booking (ชื่อ, คอร์ท, สถานะ)"
+  value={searchKeyword}
+  onChange={(e) => setSearchKeyword(e.target.value)}
+  style={{ marginBottom: 12, padding: "8px 12px", width: "100%", maxWidth: 350, border: "1px solid #d1d5db", borderRadius: 8 }}
+/>
 
-        {/* Search by Date */}
-        <input type="date" onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ padding: "8px 12px", border: "1px solid #d1d5db",borderRadius: 8, }}/>
+{/* 📅 Search by date */}
+<input
+  type="date"
+  value={searchDate}
+  onChange={(e) => setSearchDate(e.target.value)}
+  style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: 8 }}
+/>
+
         <div style={{ overflowX: "auto", background: "#fff", borderRadius: 10, boxShadow: "0 4px 10px rgba(0,0,0,0.05)" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
