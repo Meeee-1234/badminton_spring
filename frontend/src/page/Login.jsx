@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 
-const API = process.env.REACT_APP_API_URL || "https://badminton-spring.onrender.com/";
+const API = process.env.REACT_APP_API_URL || "https://badminton-spring-1.onrender.com/";
 
 export default function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
