@@ -1,8 +1,11 @@
-
 import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API = process.env.REACT_APP_API_URL || "https://badminton-hzwm.onrender.com";
+/** เปลี่ยนได้ตามสภาพแวดล้อม:
+ *  - DEV: ตั้ง .env => REACT_APP_API_URL=http://localhost:8080
+ *  - PROD: ใช้ URL เซิร์ฟเวอร์จริง
+ */
+const API = process.env.REACT_APP_API_URL || "http://localhost:8080";
 
 const OPEN_HOUR = 9;
 const CLOSE_HOUR = 21; 
@@ -51,9 +54,9 @@ export default function Details() {
   const navigate = useNavigate();
 
   const [dateKey, setDateKey] = useState(() => toDateKey());
-  const [taken, setTaken] = useState([]);      
-  const [mine, setMine]   = useState([]);       
-  const [selected, setSelected] = useState([]); 
+  const [taken, setTaken] = useState([]);      // [{key:"c:h", status:"booked|arrived"}]
+  const [mine, setMine]   = useState([]);      // ["c:h", ...]
+  const [selected, setSelected] = useState([]); // [{court, hour}]
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
@@ -192,10 +195,10 @@ export default function Details() {
     };
   }, [loadTakenMine]);
 
-    const formatHourLabel = (h) => `${h.toString().padStart(2, "0")}:00 - ${h + 1}:00`;
-    const getStatus = (c, h) => {
+  const formatHourLabel = (h) => `${h.toString().padStart(2, "0")}:00 - ${h + 1}:00`;
+  const getStatus = (c, h) => {
     const cell = taken.find(t => t.key === `${c}:${h}`);
-    return cell ? cell.status : null; // คืนค่า "booked" หรือ "arrived"
+    return cell ? cell.status : null; // "booked" หรือ "arrived" หรือ null
   };
 
   const isMine  = (c, h) => mine.includes(`${c}:${h}`);
@@ -216,9 +219,10 @@ export default function Details() {
     setMsg("");
     try {
       const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
-      const token = localStorage.getItem("auth:token");  
-      
-      if (!user?._id || !token) {
+      // เดโม่ backend: ใช้ Bearer <userId>
+      const authHeader = user?._id ? `Bearer ${user._id}` : "";
+
+      if (!user?._id) {
         setMsg("❌ กรุณาเข้าสู่ระบบก่อนจอง");
         setLoading(false);
         return;
@@ -229,7 +233,7 @@ export default function Details() {
           method: "POST",
           headers: { 
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`, 
+            Authorization: authHeader,
           },
           body: JSON.stringify({
             date: dateKey,
@@ -248,12 +252,17 @@ export default function Details() {
       }
 
       setMsg("✅ จองสำเร็จ!");
-      const newKeys = selected.map((s) => `${s.court}:${s.hour}`);
-      setMine((prev) => [...prev, ...newKeys]);
-      setTaken((prev) => [...prev, ...newKeys]);
+
+      // ✅ อัปเดตสถานะใน state ให้สอดคล้อง backend: taken = [{key,status}]
+      const newTakenObjs = selected.map(s => ({ key: `${s.court}:${s.hour}`, status: "booked" }));
+      const newMineKeys  = selected.map(s => `${s.court}:${s.hour}`);
+
+      setMine(prev => [...prev, ...newMineKeys]);
+      setTaken(prev => [...prev, ...newTakenObjs]);
       setSelected([]);
       setNote("");
 
+      // ดึงสถานะล่าสุดจากเซิร์ฟเวอร์ (กันกรณีจองชนกับคนอื่นช่วงเวลาเดียวกัน)
       loadTakenMine();
     } catch (err) {
       console.error("Booking error:", err);
@@ -504,12 +513,12 @@ const ui = {
   dotTaken: { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: colors.taken, border: `1px solid ${colors.lineStrong}` },
   dotMine:  { display: "inline-block", width: 12, height: 12, borderRadius: 999, background: "#dcfce7", border: `1px solid ${colors.success}` },
   tableFrame: {
-  background: colors.card,
-  border: `1px solid ${colors.lineStrong}`,
-  borderRadius: 16,
-  boxShadow: "0 12px 30px rgba(2,6,12,0.06)",
-  overflow: "hidden",
-},
+    background: colors.card,
+    border: `1px solid ${colors.lineStrong}`,
+    borderRadius: 16,
+    boxShadow: "0 12px 30px rgba(2,6,12,0.06)",
+    overflow: "hidden",
+  },
   headerRow: {
     display: "grid",
     gridTemplateColumns: `140px repeat(${COURTS.length}, 1fr)`,
@@ -612,7 +621,6 @@ const ui = {
           : colors.ink,
     letterSpacing: 0.2,
   }),
-
 
   right: { minWidth: 0 },
   card: {

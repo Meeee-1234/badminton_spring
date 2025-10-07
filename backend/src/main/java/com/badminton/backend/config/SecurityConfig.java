@@ -13,11 +13,12 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable()) // ❗ ปิด CSRF
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll() // ✅ อนุญาตให้ทุกคนเข้าถึง /api/auth/*
+                .requestMatchers("/api/auth/**").permitAll() 
                 .requestMatchers("/api/users/**").permitAll()
-                .anyRequest().authenticated() // 🔒 อื่น ๆ ต้อง login
+                .requestMatchers("/api/profile/**").permitAll()
+                .anyRequest().authenticated()
             );
 
-        return http.build(); // ✅ build โดยไม่ต้องใช้ httpBasic หรือ formLogin
+        return http.build(); 
     }
 }
