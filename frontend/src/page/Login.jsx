@@ -14,17 +14,17 @@ export default function Login() {
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-const saveUserNormalized = (user) => {
-  const normalized = {
-    _id: user.id || user._id,
-    name: user.name,
-    email: user.email,
-    phone: user.phone,
-    role: user.role || "user",
+  const saveUserNormalized = (rawUser) => {
+    const user = {
+      _id: rawUser?._id ?? rawUser?.id ?? rawUser?.userId ?? rawUser?.uuid,
+      name: rawUser?.name ?? rawUser?.fullName ?? rawUser?.username ?? "",
+      email: rawUser?.email ?? "",
+      role: rawUser?.role ?? "user",
+      ...rawUser,
+    };
+    if (!user._id) throw new Error("ไม่พบรหัสผู้ใช้ (_id/id)");
+    localStorage.setItem("auth:user", JSON.stringify(user));
   };
-  localStorage.setItem("auth:user", JSON.stringify(normalized)); // ✅ เก็บ user
-};
-
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,7 +47,7 @@ const saveUserNormalized = (user) => {
 
       // 2) เก็บ user: ถ้า login ส่ง user มา → normalize แล้วเก็บ
       if (data.user) {
-        saveUserNormalized(data.user); 
+        saveUserNormalized(data.user);
       } else {
         // 3) ถ้า login ไม่ส่ง user มา → ยิง /auth/me เพื่อดึงโปรไฟล์แล้วค่อยเก็บ
         const meRes = await fetch(`${API}/api/auth/me`, {
@@ -58,7 +58,7 @@ const saveUserNormalized = (user) => {
           setError(me.error || "ดึงโปรไฟล์ไม่สำเร็จ");
           return;
         }
-        saveUserNormalized(me); 
+        saveUserNormalized(me);
       }
 
       setMessage("เข้าสู่ระบบสำเร็จ ✅");

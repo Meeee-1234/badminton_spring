@@ -9,7 +9,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.*;
 
 import java.util.List;
-
 @Configuration
 public class SecurityConfig {
 
@@ -22,11 +21,17 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                // ✅ ให้ทุก API เข้าถึงได้ (แม้ /api/admin/**)
-                .requestMatchers("/**").permitAll()
+                // ✅ public APIs
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/users/**").permitAll()
+                .requestMatchers("/api/profile/**").permitAll()
+                .requestMatchers("/api/bookings/**").permitAll()
 
-                // ❌ อย่าใช้ hasRole ถ้ายังไม่มีระบบ Auth
-                .anyRequest().permitAll()
+                // ✅ admin only
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
+                // ✅ other requires login (future use)
+                .anyRequest().authenticated()
             );
 
         return http.build();
@@ -37,7 +42,7 @@ public class SecurityConfig {
         CorsConfiguration c = new CorsConfiguration();
         c.setAllowedOrigins(List.of(
             "http://localhost:3000",
-            "https://badminton-spring-1.vercel.app/",
+            "https://badminton-spring-1.vercel.app",   
             "https://badminton-spring-1.onrender.com"
         ));
         c.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
