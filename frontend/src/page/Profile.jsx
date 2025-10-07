@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API = "https://badminton-spring-1.onrender.com/";
+const API = "https://badminton-spring-1.onrender.com";
 
 export default function Profile() {
 
