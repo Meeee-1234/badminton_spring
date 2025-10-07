@@ -37,7 +37,7 @@ public class SecurityConfig {
         CorsConfiguration c = new CorsConfiguration();
         c.setAllowedOrigins(List.of(
             "http://localhost:3000",
-            "https://badminton-hzwm.vercel.app",
+            "https://badminton-spring-1.vercel.app/",
             "https://badminton-spring-1.onrender.com"
         ));
         c.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
