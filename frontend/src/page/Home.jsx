@@ -73,7 +73,7 @@ export default function Home() {
           <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", color: "white", textAlign: "center", }} >
             <p style={{ fontSize: "25px", marginBottom: "10px" }}> สนามมาตรฐาน ตีมันส์ทุกแมตช์ </p>
             <h1 style={{ fontSize: "50px", fontWeight: "800", marginBottom: "20px", textShadow: "2px 2px 8px rgba(0,0,0,0.5)", }} >
-              ! Game On !
+              !! Game On !!
             </h1><br/>
             
             {user ? (
