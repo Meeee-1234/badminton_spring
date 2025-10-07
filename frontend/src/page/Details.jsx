@@ -211,63 +211,61 @@ export default function Details() {
     );
   };
 
-  const handleConfirm = async () => {
-    setLoading(true);
-    setMsg("");
-    try {
-      const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
-      // เดโม่ backend: ใช้ Bearer <userId>
-      const authHeader = user?._id ? `Bearer ${user._id}` : "";
+const handleConfirm = async () => {
+  setLoading(true);
+  setMsg("");
 
-      if (!user?._id) {
-        setMsg("❌ กรุณาเข้าสู่ระบบก่อนจอง");
+  try {
+    const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
+
+    if (!user?._id) {
+      setMsg("❌ กรุณาเข้าสู่ระบบก่อนจอง");
+      setLoading(false);
+      return;
+    }
+
+    for (const s of selected) {
+      const res = await fetch(ENDPOINTS.create, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          userId: user._id,     // ✅ ต้องมี userId ใน body
+          date: dateKey,
+          court: s.court,
+          hour: s.hour,
+          note
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setMsg(`❌ จองคอร์ต ${s.court} เวลา ${formatHourLabel(s.hour)} ไม่สำเร็จ: ${data.error || "unknown"}`);
         setLoading(false);
         return;
       }
-
-      for (const s of selected) {
-        const res = await fetch(ENDPOINTS.create, {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            Authorization: authHeader,
-          },
-          body: JSON.stringify({
-            date: dateKey,
-            court: s.court,
-            hour: s.hour,
-            note,  
-          }),
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-          setMsg(`❌ จองคอร์ต ${s.court} เวลา ${formatHourLabel(s.hour)} ไม่สำเร็จ: ${data.error || "unknown"}`);
-          setLoading(false);
-          return;
-        }
-      }
-
-      setMsg("✅ จองสำเร็จ!");
-
-      // ✅ อัปเดตสถานะใน state ให้สอดคล้อง backend: taken = [{key,status}]
-      const newTakenObjs = selected.map(s => ({ key: `${s.court}:${s.hour}`, status: "booked" }));
-      const newMineKeys  = selected.map(s => `${s.court}:${s.hour}`);
-
-      setMine(prev => [...prev, ...newMineKeys]);
-      setTaken(prev => [...prev, ...newTakenObjs]);
-      setSelected([]);
-      setNote("");
-
-      // ดึงสถานะล่าสุดจากเซิร์ฟเวอร์ (กันกรณีจองชนกับคนอื่นช่วงเวลาเดียวกัน)
-      loadTakenMine();
-    } catch (err) {
-      console.error("Booking error:", err);
-      setMsg("❌ Server error");
-    } finally {
-      setLoading(false);
     }
-  };
+
+    setMsg("✅ จองสำเร็จ!");
+    const newTakenObjs = selected.map(s => ({ key: `${s.court}:${s.hour}`, status: "booked" }));
+    const newMineKeys = selected.map(s => `${s.court}:${s.hour}`);
+
+    setMine(prev => [...prev, ...newMineKeys]);
+    setTaken(prev => [...prev, ...newTakenObjs]);
+    setSelected([]);
+    setNote("");
+
+    loadTakenMine(); // รีโหลดหลังจองเสร็จ
+
+  } catch (err) {
+    console.error("Booking error:", err);
+    setMsg("❌ Server error");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const goHome = () => {
     try { navigate("/"); } catch { window.location.href = "/"; }

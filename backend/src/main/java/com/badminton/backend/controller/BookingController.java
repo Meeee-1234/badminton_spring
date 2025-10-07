@@ -1,87 +1,112 @@
 package com.badminton.backend.controller;
 
-import com.badminton.backend.controller.dto.CreateBookingRequest;
 import com.badminton.backend.model.Booking;
-import com.badminton.backend.service.BookingService;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
+import com.badminton.backend.model.User;
+import com.badminton.backend.repository.BookingRepository;
+import com.badminton.backend.repository.UserRepository;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/bookings")
+@CrossOrigin(origins = "*")
 public class BookingController {
 
-  private final BookingService bookingService;
+    @Autowired
+    private BookingRepository bookingRepo;
 
-  public BookingController(BookingService bookingService) {
-    this.bookingService = bookingService;
-  }
+    @Autowired
+    private UserRepository userRepo;
 
-  // ===== Helper: ดึง userId จาก Authorization: Bearer <userId> (เดโม่)
-  private String extractUserId(HttpServletRequest req) {
-    String auth = req.getHeader("Authorization");
-    if (auth != null && auth.startsWith("Bearer ")) {
-      return auth.substring(7).trim(); // ใช้เป็น userId ตรง ๆ
-    }
-    return null;
-  }
+    // ✅ check สนามกับเวลาไหนที่ถูกจองไปแล้ว
+    @GetMapping("/taken")
+    public ResponseEntity<?> getTaken(@RequestParam String date) {
+        if (!date.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "ต้องส่ง date รูปแบบ YYYY-MM-DD"));
+        }
 
-  // GET /api/bookings/taken?date=YYYY-MM-DD
-  @GetMapping("/taken")
-  public Map<String, Object> getTaken(@RequestParam("date") String dateKey) {
-    List<Booking> list = bookingService.getByDate(dateKey);
-    // frontend ต้องการ [{key:"c:h", status:"booked|arrived"}]
-    List<Map<String, String>> taken = list.stream().map(b -> {
-      Map<String, String> m = new HashMap<>();
-      m.put("key", b.getCourt() + ":" + b.getHour());
-      m.put("status", b.getStatus());
-      return m;
-    }).toList();
+        List<String> activeStatus = Arrays.asList("booked", "arrived");
+        List<Booking> bookings = bookingRepo.findByDateAndStatusIn(date, activeStatus);
 
-    Map<String, Object> out = new HashMap<>();
-    out.put("taken", taken);
-    return out;
-  }
+        List<Map<String, String>> taken = new ArrayList<>();
+        for (Booking b : bookings) {
+            taken.add(Map.of(
+                "key", b.getCourt() + ":" + b.getHour(),
+                "status", b.getStatus()
+            ));
+        }
 
-  // GET /api/bookings/my/{userId}/{date}
-  @GetMapping("/my/{userId}/{date}")
-  public Map<String, Object> getMine(@PathVariable String userId, @PathVariable String date) {
-    List<Booking> list = bookingService.getMineByDate(date, userId);
-    List<String> mine = list.stream()
-        .map(b -> b.getCourt() + ":" + b.getHour())
-        .collect(Collectors.toList());
-    Map<String, Object> out = new HashMap<>();
-    out.put("mine", mine);
-    return out;
-  }
-
-  // POST /api/bookings
-  @PostMapping
-  public ResponseEntity<?> create(@Valid @RequestBody CreateBookingRequest reqBody, HttpServletRequest req) {
-    String userId = extractUserId(req);
-    if (userId == null || userId.isBlank()) {
-      return ResponseEntity.status(401).body(Map.of("error", "missing or invalid token (need Bearer <userId> for demo)"));
+        return ResponseEntity.ok(Map.of("taken", taken));
     }
 
+    // ✅ ดึงการจองทั้งหมดของ user
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<?> getBookingsByUser(@PathVariable String userId) {
+        List<Booking> bookings = bookingRepo.findByUserId(userId);
+        return ResponseEntity.ok(Map.of("bookings", bookings));
+    }
+
+    // ✅ ดูการจองของ user ตามวัน (ไม่เอาที่ถูกยกเลิก)
+    @GetMapping("/my/{userId}/{date}")
+    public ResponseEntity<?> getMyBookings(@PathVariable String userId, @PathVariable String date) {
+        if (!date.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "ต้องส่ง date รูปแบบ YYYY-MM-DD"));
+        }
+
+        List<String> allowed = Arrays.asList("booked", "arrived");
+        List<Booking> myBookings = bookingRepo.findByUserIdAndDateAndStatusIn(userId, date, allowed);
+
+        List<String> mine = new ArrayList<>();
+        for (Booking b : myBookings) {
+            mine.add(b.getCourt() + ":" + b.getHour());
+        }
+
+        return ResponseEntity.ok(Map.of("mine", mine));
+    }
+
+@PostMapping("")
+public ResponseEntity<?> createBooking(@RequestBody Map<String, Object> req) {
     try {
-      Booking saved = bookingService.createBooked(
-          reqBody.getDate(), reqBody.getCourt(), reqBody.getHour(), userId, reqBody.getNote()
-      );
-      Map<String, Object> out = new HashMap<>();
-      out.put("id", saved.getId());
-      out.put("status", saved.getStatus());
-      out.put("date", saved.getDateKey());
-      out.put("court", saved.getCourt());
-      out.put("hour", saved.getHour());
-      return ResponseEntity.ok(out);
-    } catch (IllegalStateException e) {
-      return ResponseEntity.status(409).body(Map.of("error", "slot already taken"));
+        // รับค่าจาก req
+        String userId = (String) req.get("userId");
+        String date = (String) req.get("date");
+        String note = req.getOrDefault("note", "").toString();
+
+        // ⚠️ court กับ hour เป็น Number ต้อง cast แบบปลอดภัย
+        int court = ((Number) req.get("court")).intValue();
+        int hour = ((Number) req.get("hour")).intValue();
+
+        if (userId == null || date == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "ข้อมูลไม่ครบ"));
+        }
+
+        // หา user จาก id
+        Optional<User> userOpt = userRepo.findById(userId);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("error", "ไม่พบผู้ใช้"));
+        }
+
+        // เช็กว่าซ้ำไหม
+        List<String> activeStatus = Arrays.asList("booked", "arrived");
+        Optional<Booking> exists = bookingRepo.findByDateAndCourtAndHourAndStatusIn(date, court, hour, activeStatus);
+        if (exists.isPresent()) {
+            return ResponseEntity.status(409).body(Map.of("error", "ช่วงเวลานี้ถูกจองแล้ว"));
+        }
+
+        // สร้าง booking ใหม่
+        Booking booking = new Booking(userOpt.get(), date, court, hour, "booked", note);
+        Booking saved = bookingRepo.save(booking);
+
+        return ResponseEntity.status(201).body(Map.of("message", "จองสำเร็จ", "booking", saved));
     } catch (Exception e) {
-      return ResponseEntity.internalServerError().body(Map.of("error", "server error"));
+        e.printStackTrace(); // ✅ แสดง error บน console
+        return ResponseEntity.status(500).body(Map.of("error", "Server error", "detail", e.getMessage()));
     }
-  }
+}
+
+
 }

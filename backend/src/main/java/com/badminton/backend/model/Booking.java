@@ -1,54 +1,53 @@
 package com.badminton.backend.model;
 
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.DBRef;
 
-import java.time.Instant;
-
-@Document("bookings")
-@CompoundIndex(name = "unique_day_court_hour", def = "{'dateKey':1,'court':1,'hour':1}", unique = true)
+@Document(collection = "bookings")
 public class Booking {
-  @Id
-  private String id;
+    @Id
+    private String id;
 
-  // YYYY-MM-DD (ตามที่ frontend ใช้)
-  private String dateKey;
-  private int court;
-  private int hour;
+    @DBRef
+    private User user;
 
-  private String userId;
-  private String note;
+    private String date;   // YYYY-MM-DD
+    private int court;     // เลขคอร์ต
+    private int hour;      // ชั่วโมง (9 = 09:00-10:00)
+    private String status; // booked, arrived, canceled
+    private String note;
 
-  // "booked" | "arrived"
-  private String status = "booked";
+    public Booking() {}
 
-  private Instant createdAt = Instant.now();
+    public Booking(User user, String date, int court, int hour, String status, String note) {
+        this.user = user;
+        this.date = date;
+        this.court = court;
+        this.hour = hour;
+        this.status = status;
+        this.note = note;
+    }
 
-  public Booking() {}
+    // ✅ Getter & Setter
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
 
-  // getters/setters
-  public String getId() { return id; }
-  public void setId(String id) { this.id = id; }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 
-  public String getDateKey() { return dateKey; }
-  public void setDateKey(String dateKey) { this.dateKey = dateKey; }
+    public String getDate() { return date; }
+    public void setDate(String date) { this.date = date; }
 
-  public int getCourt() { return court; }
-  public void setCourt(int court) { this.court = court; }
+    public int getCourt() { return court; }
+    public void setCourt(int court) { this.court = court; }
 
-  public int getHour() { return hour; }
-  public void setHour(int hour) { this.hour = hour; }
+    public int getHour() { return hour; }
+    public void setHour(int hour) { this.hour = hour; }
 
-  public String getUserId() { return userId; }
-  public void setUserId(String userId) { this.userId = userId; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 
-  public String getNote() { return note; }
-  public void setNote(String note) { this.note = note; }
-
-  public String getStatus() { return status; }
-  public void setStatus(String status) { this.status = status; }
-
-  public Instant getCreatedAt() { return createdAt; }
-  public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public String getNote() { return note; }
+    public void setNote(String note) { this.note = note; }
 }
