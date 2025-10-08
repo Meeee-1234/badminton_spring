@@ -274,7 +274,7 @@ export default function Details() {
           <section style={ui.left}>
             <div style={ui.toolbar}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <button type="button" onClick={goHome} style={ui.backBtn} title="กลับหน้าแรก">
+                <button type="button" onClick={goHome} style={ui.backBtn} title="กลับหน้าแรก" >
                   ← กลับหน้าแรก
                 </button>
 
@@ -461,10 +461,10 @@ const ui = {
   backBtn: {
     padding: "8px 12px",
     borderRadius: 10,
-    border: `1px solid ${colors.lineStrong}`,
-    background: "#fff",
+    border: "1px solid #6ee7b7", 
+    background: "#ecfdf5", 
     cursor: "pointer",
-    fontWeight: 700,
+    fontWeight: 700,  
   },
   labelSm: { display: "block", fontSize: 13, fontWeight: 700, marginBottom: 6, color: colors.muted },
   badgeNote: {

@@ -308,8 +308,7 @@ export default function AdminDetails() {
             <button
               style={{ ...sx.btnGhost, fontWeight: 900, borderColor: C.primaryDark, color: C.primaryDark }}
               onClick={() => setRefreshTs(Date.now())}
-              title="ดึงรายการล่าสุดตอนนี้"
-            >
+              title="ดึงรายการล่าสุดตอนนี้" >
               รีเฟรชตอนนี้
             </button>
           </div>
@@ -515,11 +514,11 @@ const sx = {
   },
   btnGhost: {
     padding: "8px 12px",
-    border: `1px solid ${C.line2}`,
-    background: "#fff",
     borderRadius: 10,
+    border: "1px solid #6ee7b7", 
+    background: "#ecfdf5", 
     cursor: "pointer",
-    fontWeight: 700,
+    fontWeight: 700, 
   },
   btnPrimary: {
     padding: "6px 10px",

@@ -18,8 +18,6 @@ public class Booking {
     private String status; 
     private String note;
 
-    
-
     public Booking() {}
 
     public Booking(User user, String date, int court, int hour, String status, String note) {
@@ -31,25 +29,60 @@ public class Booking {
         this.note = note;
     }
 
+    public String getId() { 
+        return id; 
+    }
 
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public void setId(String id) { 
+        this.id = id; 
+    }
 
-    public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
+    public User getUser() { 
+        return user; 
+    }
 
-    public String getDate() { return date; }
-    public void setDate(String date) { this.date = date; }
+    public void setUser(User user) { 
+        this.user = user; 
+    }
 
-    public int getCourt() { return court; }
-    public void setCourt(int court) { this.court = court; }
+    public String getDate() { 
+        return date; 
+    }
 
-    public int getHour() { return hour; }
-    public void setHour(int hour) { this.hour = hour; }
+    public void setDate(String date) { 
+        this.date = date; 
+    }
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public int getCourt() { 
+        return court; 
+    }
 
-    public String getNote() { return note; }
-    public void setNote(String note) { this.note = note; }
+    public void setCourt(int court) { 
+        this.court = court; 
+    }
+
+    public int getHour() { 
+        return hour; 
+    }
+
+    public void setHour(int hour) { 
+        this.hour = hour; 
+    }
+
+    public String getStatus() { 
+        return status; 
+    }
+
+    public void setStatus(String status) { 
+        this.status = status; 
+    }
+
+    public String getNote() { 
+        return note; 
+    }
+
+    public void setNote(String note) { 
+        this.note = note; 
+    }
+    
 }

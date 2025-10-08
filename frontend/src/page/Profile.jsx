@@ -80,13 +80,14 @@ export default function Profile() {
 
     for (const url of candidates) {
       const data = await tryFetchJson(url);
-      if (data && Array.isArray(data)) {
-        const norm = data.map((b) => ({
-          _id: b._id || `${b.date}-${b.court}-${b.hour}`,
+      const list = Array.isArray(data) ? data : data?.bookings;
+      if (Array.isArray(list)) {
+        const norm = list.map((b) => ({
+          _id: b._id || b.id || `${b.date}-${b.court}-${b.hour}`,
           date: b.date,
           court: b.court,
           hour: b.hour,
-          status: b.status || (b.arrived ? "arrived" : "booked")
+          status: b.status   
         })).sort((a, b) =>
           a.date < b.date ? 1 : a.date > b.date ? -1 : a.hour - b.hour
         );
@@ -198,7 +199,7 @@ export default function Profile() {
       });
 
       const data = await res.json();
-      console.log("🛠 PATCH response:", data);
+      console.log("PATCH response:", data);
 
       if (res.ok) {
         setMessage("✅ อัปเดตข้อมูลสำเร็จ");
@@ -242,7 +243,7 @@ export default function Profile() {
 
       const data = await res.json();
       if (res.ok) {
-        setEmergencyMessage("อัพเดตข้อมูลฉุกเฉินสำเร็จ");
+        setEmergencyMessage("✅ อัพเดตข้อมูลฉุกเฉินสำเร็จ");
       } else {
         setEmergencyMessage(`${data.error || "อัพเดตไม่สำเร็จ"}`);
       }
@@ -401,7 +402,7 @@ export default function Profile() {
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "24px",}} >
-                <span style={{ fontSize: "14px" }}>{emergencyMessage}</span>
+                <span style={{ fontSize: "20px" }}>{emergencyMessage}</span>
                 <button type="submit" style={{ borderRadius: "12px", background: "#dc2626", color: "white", padding: "12px 20px",
                         fontWeight: "600", fontSize: "16px", border: "none", cursor: "pointer", boxShadow: "0 4px 8px rgba(220,38,38,0.3)", }}
                           onMouseOver={(e) => (e.target.style.background = "#b91c1c")}

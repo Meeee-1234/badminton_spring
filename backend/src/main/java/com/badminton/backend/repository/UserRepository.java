@@ -2,13 +2,17 @@ package com.badminton.backend.repository;
 
 import com.badminton.backend.model.User;
 import org.springframework.data.mongodb.repository.MongoRepository;
-
 import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends MongoRepository<User, String> {
     boolean existsByEmail(String email);
-    Optional<User> findByEmail(String email); 
+    Optional<User> findByEmail(String email);
     List<User> findByRoleIgnoreCase(String role);
 
+    // ✅ เพิ่มเมธอดใหม่ สำหรับดึงเฉพาะผู้ใช้ที่ยังไม่ถูกลบ
+    List<User> findByDeletedFalse();
+
+    // ✅ (ถ้าต้องการดูเฉพาะที่ถูกลบไปแล้ว)
+    List<User> findByDeletedTrue();
 }

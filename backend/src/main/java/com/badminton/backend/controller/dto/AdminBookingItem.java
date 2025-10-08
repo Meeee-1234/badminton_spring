@@ -1,6 +1,7 @@
 package com.badminton.backend.controller.dto;
 
 public class AdminBookingItem {
+
     private String id;
     private String date;
     private int court;
@@ -21,19 +22,58 @@ public class AdminBookingItem {
         this.note = note;
     }
 
-    public String getId() { return id; }
-    public String getDate() { return date; }
-    public int getCourt() { return court; }
-    public int getHour() { return hour; }
-    public String getStatus() { return status; }
-    public String getUserName() { return userName; }
-    public String getNote() { return note; }
+    public String getId() { 
+        return id; 
+    }
+    public String getDate() { 
+        return date; 
+    }
 
-    public void setId(String id) { this.id = id; }
-    public void setDate(String date) { this.date = date; }
-    public void setCourt(int court) { this.court = court; }
-    public void setHour(int hour) { this.hour = hour; }
-    public void setStatus(String status) { this.status = status; }
-    public void setUserName(String userName) { this.userName = userName; }
-    public void setNote(String note) { this.note = note; }
+    public int getCourt() { 
+        return court; 
+    }
+
+    public int getHour() { 
+        return hour; 
+    }
+
+    public String getStatus() { 
+        return status; 
+    }
+
+    public String getUserName() { 
+        return userName; 
+    }
+
+    public String getNote() { 
+        return note; 
+    }
+
+    public void setId(String id) { 
+        this.id = id; 
+    }
+
+    public void setDate(String date) { 
+        this.date = date; 
+    }
+
+    public void setCourt(int court) { 
+        this.court = court; 
+    }
+
+    public void setHour(int hour) { 
+        this.hour = hour; 
+    }
+
+    public void setStatus(String status) { 
+        this.status = status; 
+    }
+
+    public void setUserName(String userName) { 
+        this.userName = userName; 
+    }
+
+    public void setNote(String note) { 
+        this.note = note; 
+    }
 }
