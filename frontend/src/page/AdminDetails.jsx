@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API = "http://localhost:8080";
+const API = "https://badminton-spring-1.onrender.com";
 
 const C = {
   bg: "#f6fef8",
