@@ -10,9 +10,6 @@ public interface UserRepository extends MongoRepository<User, String> {
     Optional<User> findByEmail(String email);
     List<User> findByRoleIgnoreCase(String role);
 
-    // ✅ เพิ่มเมธอดใหม่ สำหรับดึงเฉพาะผู้ใช้ที่ยังไม่ถูกลบ
     List<User> findByDeletedFalse();
-
-    // ✅ (ถ้าต้องการดูเฉพาะที่ถูกลบไปแล้ว)
     List<User> findByDeletedTrue();
 }

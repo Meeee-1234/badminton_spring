@@ -373,21 +373,14 @@ export default function Details() {
 
               <div style={{ marginTop: 12 }}>
                 <label htmlFor="note" style={ui.labelSm}>หมายเหตุ (ถ้ามี)</label>
-                <textarea
-                  id="note"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="เช่น ต้องการคอร์ตติดผนัง / เปิดไฟเพิ่ม"
-                  style={ui.textarea}
-                  rows={3}
-                />
+                <textarea id="note" value={note}
+                          onChange={(e) => setNote(e.target.value)}
+                          placeholder="เช่น ต้องการคอร์ตติดผนัง / เปิดไฟเพิ่ม"
+                          style={ui.textarea} rows={3} />
               </div>
 
-              <button
-                onClick={handleConfirm}
-                disabled={loading || !selected.length}
-                style={{ ...ui.confirmBtn, opacity: loading ? 0.75 : 1 }}
-              >
+              <button onClick={handleConfirm} disabled={loading || !selected.length}
+                      style={{ ...ui.confirmBtn, opacity: loading ? 0.75 : 1 }} >
                 {loading ? "กำลังยืนยัน..." : "ยืนยันการจอง"}
               </button>
 

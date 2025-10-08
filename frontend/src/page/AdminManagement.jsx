@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API = process.env.REACT_APP_API_URL || "https://badminton-spring-1.onrender.com";
@@ -10,12 +10,11 @@ export default function AdminManagement() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-
-  // ==== NEW: states สำหรับ Search บล็อก Bookings ====
   const [searchKeyword, setSearchKeyword] = useState("");
   const [searchDate, setSearchDate] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all"); // all | booked | arrived | canceled
-  // ===================================================
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [authUser, setAuthUser] = useState(null);
+  const tokenRef = useRef("");
 
   const isAdmin = (role) => !!String(role || "").match(/admin/i);
   const idOf = (obj) => obj?.id ?? obj?._id ?? obj?.userId ?? null;
@@ -44,7 +43,7 @@ export default function AdminManagement() {
   const handleDeleteUser = async (id) => {
     if (!window.confirm("คุณแน่ใจหรือไม่ที่จะลบผู้ใช้นี้?")) return;
 
-    const token = localStorage.getItem("auth:token");
+    const token = tokenRef.current;
     if (!token) {
       alert("ไม่มี token");
       return;
@@ -60,12 +59,7 @@ export default function AdminManagement() {
       const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || "ลบผู้ใช้ไม่สำเร็จ");
 
-      setUsers((prev) =>
-        prev.map((u) =>
-          idOf(u) === id ? { ...u, deleted: true } : u
-        )
-      );
-
+      setUsers((prev) => prev.map((u) => (idOf(u) === id ? { ...u, deleted: true } : u)));
       alert(data.message || "ลบสำเร็จ");
     } catch (err) {
       console.error("Delete user error:", err);
@@ -73,64 +67,112 @@ export default function AdminManagement() {
     }
   };
 
+  const fetchUsers = useCallback(async () => {
+    const token = tokenRef.current;
+    const res = await fetch(`${API}/api/admin/users`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await safeJson(res);
+    if (!res.ok) throw new Error(data.error || "โหลด users ไม่สำเร็จ");
+    setUsers(normalizeUsers(data));
+  }, []);
+
+  const fetchBookings = useCallback(async () => {
+    const token = tokenRef.current;
+    const res = await fetch(`${API}/api/admin/bookings`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await safeJson(res);
+    if (!res.ok) throw new Error(data.error || "โหลด bookings ไม่สำเร็จ");
+    setBookings(normalizeBookings(data));
+  }, []);
+
+  const loadAll = useCallback(async () => {
+    try {
+      await Promise.all([fetchUsers(), fetchBookings()]);
+      setMessage("");
+    } catch (e) {
+      console.error("โหลดข้อมูลไม่สำเร็จ:", e);
+      setMessage(e.message || "โหลดข้อมูลไม่สำเร็จ");
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchUsers, fetchBookings]);
+
   useEffect(() => {
-    const token = localStorage.getItem("auth:token");
+    const token = localStorage.getItem("auth:token") || "";
     const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
+    tokenRef.current = token;
+    setAuthUser(user);
 
     if (!token || !isAdmin(user.role)) {
       alert("คุณไม่มีสิทธิ์การเข้าถึงหน้านี้ (Admin เท่านั้น)");
       navigate("/");
       return;
     }
+    loadAll();
+  }, [navigate, loadAll]);
 
-    async function fetchUsers() {
-      try {
-        const res = await fetch(`${API}/api/admin/users`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        setUsers(normalizeUsers(data));
-      } catch (err) {
-        console.error("❌ Users error:", err);
-        setUsers([]);
-      }
+  useEffect(() => {
+    const intervalMs = 15000;
+    const t = setInterval(() => {
+      if (!document.hidden) loadAll();
+    }, intervalMs);
+
+    const handleFocus = () => loadAll();
+    window.addEventListener("focus", handleFocus);
+
+    const handleVisibility = () => {
+      if (!document.hidden) loadAll();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    let bc = null;
+    if ("BroadcastChannel" in window) {
+      bc = new BroadcastChannel("booking-events");
+      bc.onmessage = (e) => {
+        const type = e?.data?.type || "";
+        if (type === "booking-updated" || type === "admin-updated") {
+          loadAll();
+        }
+      };
     }
 
-    async function fetchBookings() {
-      try {
-        const res = await fetch(`${API}/api/admin/bookings`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        setBookings(normalizeBookings(data));
-      } catch (err) {
-        console.error("❌ Bookings error:", err);
-        setBookings([]);
+    const handleStorage = (e) => {
+      if (e.key === "booking:updated" && e.newValue) {
+        loadAll();
       }
-    }
+    };
+    window.addEventListener("storage", handleStorage);
 
-    Promise.all([fetchUsers(), fetchBookings()]).finally(() => setLoading(false));
-  }, [navigate]);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("storage", handleStorage);
+      if (bc) bc.close();
+    };
+  }, [loadAll]);
 
-  // ===== Helpers สำหรับแสดงผลและค้นหา =====
   const timeLabel = (h) =>
     `${String(h).padStart(2, "0")}:00 - ${String(h + 1).padStart(2, "0")}:00`;
 
   const statusTh = (s) =>
-    s === "booked" ? "จองแล้ว" : s === "arrived" ? "มาแล้ว" : s === "canceled" ? "ยกเลิก" : s || "-";
+    s === "booked"
+      ? "จองแล้ว"
+      : s === "arrived"
+      ? "มาแล้ว"
+      : s === "canceled"
+      ? "ยกเลิก"
+      : s || "-";
 
-  // ===== NEW: กรอง Bookings ตาม keyword / date / status =====
   const filteredBookings = useMemo(() => {
     const q = searchKeyword.trim().toLowerCase();
 
     return bookings.filter((b) => {
-      // กรองสถานะ
       if (statusFilter !== "all" && String(b.status) !== statusFilter) return false;
-
-      // กรองวันที่ (ต้องตรงกับรูปแบบ yyyy-mm-dd ในฟิลด์ b.date)
       if (searchDate && String(b.date).slice(0, 10) !== searchDate) return false;
 
-      // กรอง keyword
       if (!q) return true;
 
       const hay = [
@@ -184,20 +226,38 @@ export default function AdminManagement() {
         </button>
 
         <h1 style={{ fontSize: 40, fontWeight: 800 }}>📊 Admin Management 📊</h1>
-        <button
-          onClick={handleLogout}
-          style={{
-            background: "#ef4444",
-            color: "#fff",
-            border: "none",
-            padding: "8px 16px",
-            borderRadius: 8,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          Logout
-        </button>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={loadAll}
+            title="รีเฟรชตอนนี้"
+            style={{
+              background: "#10b981",
+              color: "#fff",
+              border: "none",
+              padding: "8px 16px",
+              borderRadius: 8,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            รีเฟรช
+          </button>
+          <button
+            onClick={handleLogout}
+            style={{
+              background: "#ef4444",
+              color: "#fff",
+              border: "none",
+              padding: "8px 16px",
+              borderRadius: 8,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Logout
+          </button>
+        </div>
       </div>
 
       {message && (
@@ -291,132 +351,141 @@ export default function AdminManagement() {
         <h2 style={{ fontSize: 30, fontWeight: 700, marginBottom: 12 }}>📝 Bookings 📝</h2>
         <br />
 
-        {/* ===== NEW: แถบค้นหา/กรองสำหรับ Bookings ===== */}
         <div
           style={{
             display: "flex",
-            flexWrap: "wrap",
-            gap: 12,
-            alignItems: "center",
+            justifyContent: "center",
             marginBottom: 12,
+            padding: "0 12px",
           }}
         >
-          {/* ค้นหาคีย์เวิร์ด */}
-          <div style={{ position: "relative" }}>
-            <input
-              value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
-              placeholder="ค้นหา (ผู้ใช้/วันที่/คอร์ต/เวลา/สถานะ)…"
-              style={{
-                padding: "10px 36px 10px 12px",
-                border: "1px solid #e5e7eb",
-                borderRadius: 10,
-                background: "#fff",
-                fontSize: 14,
-                outline: "none",
-                minWidth: 260,
-              }}
-            />
-            {searchKeyword && (
-              <button
-                onClick={() => setSearchKeyword("")}
-                title="ล้างคำค้น"
-                style={{
-                  position: "absolute",
-                  right: 6,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  border: "1px solid #e5e7eb",
-                  background: "#fff",
-                  borderRadius: 8,
-                  width: 24,
-                  height: 24,
-                  lineHeight: "22px",
-                  textAlign: "center",
-                  cursor: "pointer",
-                  fontWeight: 900,
-                  color: "#64748b",
-                }}
-              >
-                ×
-              </button>
-            )}
-          </div>
-
-          {/* เลือกวันที่ */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <label style={{ fontSize: 13, color: "#64748b", fontWeight: 700 }}>วันที่:</label>
-            <input
-              type="date"
-              value={searchDate}
-              onChange={(e) => setSearchDate(e.target.value)}
-              style={{
-                padding: "8px 12px",
-                border: "1px solid #e5e7eb",
-                borderRadius: 10,
-                background: "#fff",
-                fontSize: 14,
-                outline: "none",
-              }}
-            />
-            {searchDate && (
-              <button
-                onClick={() => setSearchDate("")}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 10,
-                  border: "1px solid #6ee7b7",
-                  background: "#ecfdf5",
-                  cursor: "pointer",
-                  fontWeight: 700,
-                }}
-              >
-                ล้างวันที่
-              </button>
-            )}
-          </div>
-
-          {/* ตัวกรองสถานะ */}
           <div
             style={{
               display: "flex",
+              flexWrap: "wrap",
+              gap: 12,
               alignItems: "center",
-              gap: 8,
-              background: "#fff",
-              border: "1px solid #e5e7eb",
-              borderRadius: 999,
-              padding: "8px 12px",
-              boxShadow: "0 4px 18px rgba(2,6,12,.05)",
-              whiteSpace: "nowrap",
+              justifyContent: "center",
+              width: "100%",
+              maxWidth: 980,
             }}
           >
-            <span style={{ fontSize: 13, color: "#64748b" }}>สถานะ:</span>
-            {[
-              { k: "all", t: "ทั้งหมด" },
-              { k: "booked", t: "จองแล้ว" },
-              { k: "arrived", t: "มาแล้ว" },
-              { k: "canceled", t: "ยกเลิก" },
-            ].map((it) => (
-              <button
-                key={it.k}
-                onClick={() => setStatusFilter(it.k)}
+            {/* คีย์เวิร์ด */}
+            <div style={{ position: "relative" }}>
+              <input
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                placeholder="ค้นหา (ผู้ใช้/วันที่/คอร์ต/เวลา/สถานะ)…"
                 style={{
-                  padding: "6px 10px",
-                  borderRadius: 999,
-                  border: `1px solid ${statusFilter === it.k ? "#10b981" : "#e5e7eb"}`,
-                  background: statusFilter === it.k ? "#ecfdf5" : "#fff",
-                  color: statusFilter === it.k ? "#10b981" : "#0f172a",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  fontSize: 13,
+                  padding: "10px 36px 10px 12px",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 10,
+                  background: "#fff",
+                  fontSize: 14,
+                  outline: "none",
+                  minWidth: 260,
                 }}
-              >
-                {it.t}
-              </button>
-            ))}
+              />
+              {searchKeyword && (
+                <button
+                  onClick={() => setSearchKeyword("")}
+                  title="ล้างคำค้น"
+                  style={{
+                    position: "absolute",
+                    right: 6,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    border: "1px solid #e5e7eb",
+                    background: "#fff",
+                    borderRadius: 8,
+                    width: 24,
+                    height: 24,
+                    lineHeight: "22px",
+                    textAlign: "center",
+                    cursor: "pointer",
+                    fontWeight: 900,
+                    color: "#64748b",
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            {/* วันที่ */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <label style={{ fontSize: 13, color: "#64748b", fontWeight: 700 }}>วันที่:</label>
+              <input
+                type="date"
+                value={searchDate}
+                onChange={(e) => setSearchDate(e.target.value)}
+                style={{
+                  padding: "8px 12px",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 10,
+                  background: "#fff",
+                  fontSize: 14,
+                  outline: "none",
+                }}
+              />
+              {searchDate && (
+                <button
+                  onClick={() => setSearchDate("")}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 10,
+                    border: "1px solid #6ee7b7",
+                    background: "#ecfdf5",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                  }}
+                >
+                  ล้างวันที่
+                </button>
+              )}
+            </div>
+
+            {/* สถานะ */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                background: "#fff",
+                border: "1px solid #e5e7eb",
+                borderRadius: 999,
+                padding: "8px 12px",
+                boxShadow: "0 4px 18px rgba(2,6,12,.05)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <span style={{ fontSize: 13, color: "#64748b" }}>สถานะ:</span>
+              {[
+                { k: "all", t: "ทั้งหมด" },
+                { k: "booked", t: "จองแล้ว" },
+                { k: "arrived", t: "มาแล้ว" },
+                { k: "canceled", t: "ยกเลิก" },
+              ].map((it) => (
+                <button
+                  key={it.k}
+                  onClick={() => setStatusFilter(it.k)}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: 999,
+                    border: `1px solid ${statusFilter === it.k ? "#10b981" : "#e5e7eb"}`,
+                    background: statusFilter === it.k ? "#ecfdf5" : "#fff",
+                    color: statusFilter === it.k ? "#10b981" : "#0f172a",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontSize: 13,
+                  }}
+                >
+                  {it.t}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-        {/* ===== /NEW ===== */}
 
         <div
           style={{

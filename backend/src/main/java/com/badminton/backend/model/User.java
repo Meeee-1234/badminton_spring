@@ -14,7 +14,7 @@ public class User {
     private String password;
     private String role = "user";
 
-    private boolean deleted = false;  // ✅ ฟิลด์สำหรับ Soft Delete
+    private boolean deleted = false;  
 
     public User() {}
 
