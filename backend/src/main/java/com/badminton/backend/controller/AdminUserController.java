@@ -37,19 +37,18 @@ public class AdminUserController {
 
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> softDeleteUser(@PathVariable String id) {
-        Optional<User> optional = userRepo.findById(id);
-        if (optional.isEmpty()) {
-            return ResponseEntity.status(404).body(Map.of("error", "ไม่พบผู้ใช้"));
+        public ResponseEntity<?> softDeleteUser(@PathVariable String id) {
+            Optional<User> opt = userRepo.findById(id);
+            if (opt.isEmpty()) {
+                return ResponseEntity.status(404).body(Map.of("error", "ไม่พบผู้ใช้"));
+            }
+
+            User user = opt.get();
+            user.setDeleted(true); // ✅ mark ลบ
+            userRepo.save(user);
+
+            return ResponseEntity.ok(Map.of("message", "ปิดการใช้งานผู้ใช้เรียบร้อย"));
         }
-
-        User user = optional.get();
-        user.setDeleted(true);  
-        userRepo.save(user);
-
-        return ResponseEntity.ok(Map.of("message", "ลบผู้ใช้ (Soft Delete) เรียบร้อยแล้ว"));
-    }
-
 
     @GetMapping("/deleted")
     public ResponseEntity<?> getDeletedUsers() {

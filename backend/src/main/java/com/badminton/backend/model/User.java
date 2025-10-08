@@ -14,7 +14,7 @@ public class User {
     private String password;
     private String role = "user";
 
-    private boolean deleted = false;  
+    private Boolean deleted = false; 
 
     public User() {}
 
@@ -43,4 +43,10 @@ public class User {
     public void setPassword(String password) { this.password = password; }
     public void setRole(String role) { this.role = role; }
     public void setDeleted(boolean deleted) { this.deleted = deleted; }
+    public Boolean getDeleted() {
+        return deleted;
+    }
+    public void setDeleted(Boolean deleted) {
+        this.deleted = deleted;
+    }
 }
