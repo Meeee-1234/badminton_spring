@@ -13,25 +13,24 @@ export default function AdminManagement() {
   const [message, setMessage] = useState("");
   const [searchKeyword, setSearchKeyword] = useState("");
   const [searchDate, setSearchDate] = useState("");
-  
 
   // ===== Helpers =====
   const isAdmin = (role) => !!String(role || "").match(/admin/i);
   const idOf = (obj) => obj?.id ?? obj?._id ?? obj?.userId ?? null;
 
-  const normalizeUsers = (data) => {
-    const list = Array.isArray(data) ? data : (data?.users ?? data?.data ?? []);
-    return Array.isArray(list) ? list : [];
-  };
+  const normalizeUsers = (data) => (Array.isArray(data) ? data : []);
   const normalizeBookings = (data) => {
-    const list = Array.isArray(data) ? data : (data?.bookings ?? data?.data ?? []);
+    const list = Array.isArray(data) ? data : data?.bookings ?? data?.data ?? [];
     return Array.isArray(list) ? list : [];
   };
 
   const safeJson = async (res) => {
     const text = await res.text();
-    try { return JSON.parse(text); }
-    catch { throw new Error(`Response is not JSON: ${text.slice(0, 200)}`); }
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`Response is not JSON: ${text.slice(0, 200)}`);
+    }
   };
 
   // ===== Actions =====
@@ -45,7 +44,10 @@ export default function AdminManagement() {
     if (!window.confirm("คุณแน่ใจหรือไม่ที่จะลบผู้ใช้นี้?")) return;
 
     const token = localStorage.getItem("auth:token");
-    if (!token) { alert("ไม่มี token"); return; }
+    if (!token) {
+      alert("ไม่มี token");
+      return;
+    }
 
     const uid = encodeURIComponent(id);
     try {
@@ -65,13 +67,10 @@ export default function AdminManagement() {
     }
   };
 
-  // ===== Fetch =====
+  // ===== Fetch Users =====
   useEffect(() => {
     const token = localStorage.getItem("auth:token");
     const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
-
-    console.log("AdminManagement token?", token ? `${token.slice(0, 10)}...` : "(none)");
-    console.log("AdminManagement role =", user.role);
 
     if (!token || !isAdmin(user.role)) {
       alert("คุณไม่มีสิทธิ์การเข้าถึงหน้านี้ (Admin เท่านั้น)");
@@ -79,49 +78,47 @@ export default function AdminManagement() {
       return;
     }
 
-    async function fetchData() {
-      setLoading(true);
-      setMessage("");
+    async function fetchUsers() {
       try {
-        const qs = searchDate ? `?date=${encodeURIComponent(searchDate)}` : "";
-        const [userRes, bookingRes] = await Promise.all([
-          fetch(`${API}/api/admin/users`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${API}/api/admin/bookings${qs}`, { headers: { Authorization: `Bearer ${token}` } }),
-        ]);
-
-        console.log("[admin/users] status =", userRes.status, userRes.statusText);
-        console.log("[admin/bookings] status =", bookingRes.status, bookingRes.statusText);
-
-        if (!userRes.ok) {
-          const body = await userRes.text();
-          const snippet = body ? body.slice(0, 200) : "(empty)";
-          throw new Error(`โหลด users ไม่สำเร็จ: [${userRes.status}] ${userRes.statusText} :: ${snippet}`);
-        }
-        if (!bookingRes.ok) {
-          const body = await bookingRes.text();
-          const snippet = body ? body.slice(0, 200) : "(empty)";
-          throw new Error(`โหลด bookings ไม่สำเร็จ: [${bookingRes.status}] ${bookingRes.statusText} :: ${snippet}`);
-        }
-
-        const [userData, bookingData] = await Promise.all([userRes.json(), bookingRes.json()]);
-        const normalizedUsers = normalizeUsers(userData).filter((u) => !isAdmin(u.role));
-        const normalizedBookings = normalizeBookings(bookingData);
-
-        console.log("✅ users:", normalizedUsers);
-        console.log("✅ bookings:", normalizedBookings);
-
-        setUsers(normalizedUsers);
-        setBookings(normalizedBookings);
+        const res = await fetch(`${API}/api/admin/users`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        setUsers(normalizeUsers(data));
       } catch (err) {
-        console.error("โหลดข้อมูลล้มเหลว:", err);
-        setMessage("โหลดข้อมูลไม่สำเร็จ: " + err.message);
+        console.error("❌ Users error:", err);
+        setUsers([]);
       } finally {
         setLoading(false);
       }
     }
 
-    fetchData();
-  }, [navigate, searchDate]);
+    fetchUsers();
+  }, [navigate]);
+
+  // ===== Fetch Bookings =====
+  useEffect(() => {
+    const token = localStorage.getItem("auth:token");
+    if (!token) return;
+
+    async function fetchBookings() {
+      try {
+        const qs = searchDate ? `?date=${encodeURIComponent(searchDate)}` : "";
+        const res = await fetch(`${API}/api/admin/bookings${qs}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        setBookings(normalizeBookings(data));
+      } catch (err) {
+        console.error("❌ Bookings error:", err);
+        setBookings([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchBookings();
+  }, [searchDate]);
 
   // ===== Filters =====
   const filteredBookings = useMemo(() => {
@@ -132,10 +129,14 @@ export default function AdminManagement() {
       const date = (b.date || "").toLowerCase();
       const court = String(b.court ?? "").toLowerCase();
       const status = (b.status || "").toLowerCase();
-      return name.includes(keyword) || date.includes(keyword) || court.includes(keyword) || status.includes(keyword);
+      return (
+        name.includes(keyword) ||
+        date.includes(keyword) ||
+        court.includes(keyword) ||
+        status.includes(keyword)
+      );
     });
   }, [bookings, searchKeyword]);
-
   // ===== UI =====
   return (
     <div style={{ padding: 20, fontFamily: "Segoe UI, sans-serif", background: "#f9fafb", minHeight: "100vh" }}>
@@ -171,34 +172,64 @@ export default function AdminManagement() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr><td colSpan={5} style={{ textAlign: "center", padding: 16 }}>กำลังโหลด...</td></tr>
-              ) : users.length > 0 ? (
-                users.map((u, index) => {
-                  const uid = idOf(u);
-                  return (
-                    <tr key={uid || index}>
-                      <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{index + 1}</td>
-                      <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u.name}</td>
-                      <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u.email}</td>
-                      <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>{u.phone || "-"}</td>
-                      <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
-                        <button
-                          onClick={() => handleDeleteUser(uid)}
-                          disabled={!uid}
-                          style={{ background: "#ef4444", color: "#fff", border: "none", padding: "6px 12px", borderRadius: 6, fontWeight: 600, cursor: "pointer", opacity: uid ? 1 : 0.5 }}
-                          title={uid ? "ลบผู้ใช้" : "ไม่พบ ID ผู้ใช้"}
-                        >
-                          🗑 Delete
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr><td colSpan={5} style={{ textAlign: "center", color: "#9ca3af", padding: 10 }}>ไม่มีข้อมูลผู้ใช้</td></tr>
-              )}
-            </tbody>
+  {loading ? (
+    <tr>
+      <td colSpan={5} style={{ textAlign: "center", padding: 16 }}>
+        กำลังโหลด...
+      </td>
+    </tr>
+  ) : users.length > 0 ? (
+    users.map((u, index) => {
+      const uid = idOf(u);
+      return (
+        <tr key={uid || index}>
+          <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
+            {index + 1}
+          </td>
+          <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
+            {u.name || "-"}
+          </td>
+          <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
+            {u.email || "-"}
+          </td>
+          <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
+            {u.phone || "-"}
+          </td>
+          <td style={{ padding: 10, borderBottom: "1px solid #e5e7eb" }}>
+            <button
+              onClick={() => handleDeleteUser(uid)}
+              disabled={!uid}
+              style={{
+                background: "#ef4444",
+                color: "#fff",
+                border: "none",
+                padding: "6px 12px",
+                borderRadius: 6,
+                fontWeight: 600,
+                cursor: "pointer",
+                opacity: uid ? 1 : 0.5,
+              }}
+              title={uid ? "ลบผู้ใช้" : "ไม่พบ ID ผู้ใช้"}
+            >
+              🗑 Delete
+            </button>
+          </td>
+        </tr>
+      );
+    })
+  ) : (
+    <tr>
+      <td
+        colSpan={5}
+        style={{ textAlign: "center", color: "#9ca3af", padding: 10 }}
+      >
+        ไม่มีข้อมูลผู้ใช้
+      </td>
+    </tr>
+  )}
+</tbody>
+
+
           </table>
         </div>
       </section>

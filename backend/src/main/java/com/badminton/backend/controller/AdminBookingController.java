@@ -63,6 +63,8 @@ public class AdminBookingController {
         return ResponseEntity.ok(Map.of("bookings", items));
     }
 
+    
+
     /** ✅ PUT /api/admin/bookings/{id}/status */
     @PutMapping("/{id}/status")
     public ResponseEntity<?> updateStatus(@PathVariable String id, @RequestBody UpdateStatusRequest req) {
