@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-// ใช้ค่าคงที่ให้ตรงกับแบ็กเอนด์ปัจจุบันของคุณ
 const API = "https://badminton-spring-1.onrender.com";
 
 export default function Profile() {
@@ -19,18 +18,15 @@ export default function Profile() {
     emergencyPhone: "",
   });
 
-  // โหลดข้อมูลโปรไฟล์ + emergency จาก localStorage & API
   useEffect(() => {
     const u = JSON.parse(localStorage.getItem("auth:user") || "{}");
     console.log("📦 Local user:", u);
 
-    // ✅ ใช้ u.id (ไม่ใช่ u._id)
     if (u?.id) {
       setUserId(u.id);
       setUser({ name: u.name, email: u.email, phone: u.phone });
       setEditForm({ name: u.name, email: u.email, phone: u.phone });
 
-      // ✅ Emergency profile
       fetch(`${API}/api/profile/${u.id}`)
         .then((res) => {
           if (!res.ok) throw new Error("เกิดข้อผิดพลาด");
@@ -50,7 +46,6 @@ export default function Profile() {
     }
   }, []);
 
-  // ===== Utils สำหรับโหลดประวัติการจอง =====
   const tryFetchJson = async (url) => {
     try {
       const res = await fetch(url, { cache: "no-store" });
@@ -77,7 +72,6 @@ export default function Profile() {
   const loadBookingHistory = async (uid) => {
     if (!uid) return;
 
-    // 1) ลองเรียก endpoint ที่คาดว่าน่าจะมีอยู่
     const candidates = [
       `${API}/api/bookings/user/${uid}`,
       `${API}/api/bookings/history/${uid}`,
@@ -87,7 +81,6 @@ export default function Profile() {
     for (const url of candidates) {
       const data = await tryFetchJson(url);
       if (data && Array.isArray(data)) {
-        // normalize
         const norm = data.map((b) => ({
           _id: b._id || `${b.date}-${b.court}-${b.hour}`,
           date: b.date,
@@ -103,7 +96,6 @@ export default function Profile() {
       }
     }
 
-    // 2) แผนสำรอง: ไล่ย้อนหลัง 30 วัน โดยใช้ /api/bookings/my/:userId/:date
     const today = new Date();
     const days = 30;
     const results = [];
@@ -114,7 +106,6 @@ export default function Profile() {
       const data = await tryFetchJson(url);
 
       if (data?.mine && Array.isArray(data.mine)) {
-        // รูปแบบ { mine: ["c:h", ...] }
         data.mine.forEach((ch) => {
           const [c, h] = ch.split(":").map(Number);
           results.push({
@@ -126,7 +117,6 @@ export default function Profile() {
           });
         });
       } else if (Array.isArray(data?.items)) {
-        // เผื่อแบ็กเอนด์ส่ง { items: [...] } มา
         data.items.forEach((b) =>
           results.push({
             _id: b._id || `${b.date}-${b.court}-${b.hour}`,
@@ -145,12 +135,10 @@ export default function Profile() {
     setBookings(results);
   };
 
-  // โหลดประวัติหลังรู้ userId
   useEffect(() => {
     if (userId) loadBookingHistory(userId);
   }, [userId]);
 
-  // ฟัง BroadcastChannel / localStorage เพื่อรีโหลดประวัติเมื่อจองสำเร็จจากหน้า Details
   useEffect(() => {
     let bc;
     const onStorage = (e) => {
@@ -183,7 +171,6 @@ export default function Profile() {
     };
   }, [userId]);
 
-  // ====== ฟอร์มแก้ไขโปรไฟล์ ======
   const handleChange = (e) => {
     setEditForm({ ...editForm, [e.target.name]: e.target.value });
   };
@@ -232,14 +219,12 @@ export default function Profile() {
     }
   };
 
-  // ====== Logout ======
   const handleLogout = () => {
     localStorage.removeItem("auth:token");
     localStorage.removeItem("auth:user");
     navigate("/");
   };
 
-  // ====== Emergency ======
   const handleEmergencyChange = (e) => {
     setEmergencyForm({ ...emergencyForm, [e.target.name]: e.target.value });
   };
@@ -272,48 +257,17 @@ export default function Profile() {
       <section style={{ position: "relative" }}>
         <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "40px 20px" }}>
           <div style={{ textAlign: "left" }}>
-            <a
-              href="/"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                borderRadius: "12px",
-                border: "1px solid #6ee7b7",
-                fontSize: "18px",
-                background: "#ecfdf5",
-                padding: "8px 16px",
-                color: "#065f46",
-                fontWeight: "600",
-                textDecoration: "none",
-                marginBottom: "20px",
-              }}
-            >
+            <a href="/"
+               style={{ display: "inline-flex", alignItems: "center", gap: "8px", borderRadius: "12px", border: "1px solid #6ee7b7", fontSize: "18px", background: "#ecfdf5", padding: "8px 16px", color: "#065f46",
+                        fontWeight: "600", textDecoration: "none", marginBottom: "20px", }} >
               ← กลับหน้าแรก
             </a>
           </div>
 
-          <h1
-            style={{
-              fontSize: "3rem",
-              fontWeight: "800",
-              color: "#064e3b",
-              textAlign: "center",
-            }}
-          >
+          <h1 style={{ fontSize: "3rem", fontWeight: "800", color: "#064e3b", textAlign: "center", }} >
             Your Profile
           </h1>
-          <p
-            style={{
-              fontSize: "20px",
-              color: "#4b5563",
-              marginTop: "10px",
-              maxWidth: "700px",
-              textAlign: "center",
-              marginLeft: "auto",
-              marginRight: "auto",
-            }}
-          >
+          <p style={{ fontSize: "20px", color: "#4b5563", marginTop: "10px", maxWidth: "700px", textAlign: "center", marginLeft: "auto", marginRight: "auto", }} >
             จัดการข้อมูลบัญชีของคุณ และอัปเดตเบอร์ติดต่อเพื่อการจองที่รวดเร็วขึ้น
           </p>
         </div>
@@ -322,31 +276,11 @@ export default function Profile() {
       <section style={{ maxWidth: "1200px", margin: "0 auto" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "24px" }}>
           <aside>
-            <div
-              style={{
-                borderRadius: "16px",
-                border: "1px solid #6ee7b7",
-                background: "white",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                padding: "24px",
-              }}
-            >
+            <div style={{ borderRadius: "16px", border: "1px solid #6ee7b7", background: "white", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", padding: "24px", }} >
               <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                 {/* Avatar */}
-                <div
-                  style={{
-                    height: "56px",
-                    width: "56px",
-                    borderRadius: "50%",
-                    background: "#d1fae5",
-                    color: "#065f46",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: "800",
-                    fontSize: "30px",
-                  }}
-                >
+                <div style={{ height: "56px", width: "56px", borderRadius: "50%", background: "#d1fae5", color: "#065f46", display: "flex",
+                              alignItems: "center", justifyContent: "center", fontWeight: "800", fontSize: "30px",}}>
                   {user.name?.[0] || "U"}
                 </div>
 
@@ -369,23 +303,10 @@ export default function Profile() {
               </div>
 
               <div style={{ marginTop: "24px" }}>
-                <button
-                  onClick={handleLogout}
-                  style={{
-                    width: "100%",
-                    borderRadius: "12px",
-                    background: "#dc2626",
-                    color: "white",
-                    padding: "12px",
-                    fontWeight: "600",
-                    fontSize: "15px",
-                    border: "none",
-                    cursor: "pointer",
-                    boxShadow: "0 4px 8px rgba(220,38,38,0.3)",
-                  }}
-                  onMouseOver={(e) => (e.target.style.background = "#b91c1c")}
-                  onMouseOut={(e) => (e.target.style.background = "#dc2626")}
-                >
+                <button onClick={handleLogout}
+                        style={{width: "100%", borderRadius: "12px", background: "#dc2626", color: "white", padding: "12px", fontWeight: "600", fontSize: "15px", border: "none", cursor: "pointer", boxShadow: "0 4px 8px rgba(220,38,38,0.3)", }}
+                                onMouseOver={(e) => (e.target.style.background = "#b91c1c")}
+                                onMouseOut={(e) => (e.target.style.background = "#dc2626")} >
                   Logout
                 </button>
               </div>
@@ -394,104 +315,35 @@ export default function Profile() {
 
           <main>
             {/* Edit Information */}
-            <form
-              onSubmit={handleSave}
-              style={{
-                borderRadius: "16px",
-                border: "1px solid #6ee7b7",
-                background: "white",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                padding: "30px",
-                marginBottom: "20px",
-              }}
-            >
-              <h2
-                style={{
-                  fontSize: "30px",
-                  fontWeight: "700",
-                  color: "#065f46",
-                  marginBottom: "16px",
-                }}
-              >
+            <form onSubmit={handleSave}
+                  style={{ borderRadius: "16px", border: "1px solid #6ee7b7", background: "white", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", padding: "30px", marginBottom: "20px", }} >
+              <h2 style={{ fontSize: "30px", fontWeight: "700", color: "#065f46", marginBottom: "16px",}}>
                 Edit Information
               </h2>
               <br />
 
               <div style={{ display: "grid", gap: "20px", paddingRight: "20px" }}>
                 <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "20px",
-                      fontWeight: "bold",
-                      marginBottom: "6px",
-                      textAlign: "left",
-                    }}
-                  >
+                  <label style={{ display: "block", fontSize: "20px", fontWeight: "bold", marginBottom: "6px", textAlign: "left",}}>
                     Username
                   </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={editForm.name}
-                    onChange={handleChange}
-                    style={{
-                      width: "100%",
-                      borderRadius: "8px",
-                      border: "1px solid #6ee7b7",
-                      padding: "10px",
-                      outline: "none",
-                      fontSize: "16px",
-                    }}
-                  />
+                  <input type="text" name="name"value={editForm.name} onChange={handleChange}
+                         style={{ width: "100%", borderRadius: "8px", border: "1px solid #6ee7b7", padding: "10px", outline: "none", fontSize: "16px",}} />
                 </div>
 
                 <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "20px",
-                      fontWeight: "bold",
-                      marginBottom: "6px",
-                      textAlign: "left",
-                    }}
-                  >
+                  <label style={{ display: "block", fontSize: "20px", fontWeight: "bold", marginBottom: "6px", textAlign: "left",}}>
                     Email
                   </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={editForm.email}
-                    readOnly // ✅ ไม่ให้แก้ไขอีเมล
-                    style={{
-                      width: "100%",
-                      borderRadius: "8px",
-                      border: "1px solid #e5e7eb",
-                      padding: "10px",
-                      outline: "none",
-                      fontSize: "16px",
-                      backgroundColor: "#f9fafb",
-                      color: "#6b7280",
-                    }}
-                  />
+                  <input type="email" name="email" value={editForm.email} readOnly 
+                         style={{ width: "100%", borderRadius: "8px", border: "1px solid #e5e7eb", padding: "10px", outline: "none", fontSize: "16px", backgroundColor: "#f9fafb", color: "#6b7280", }} />
                 </div>
 
                 <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "20px",
-                      fontWeight: "bold",
-                      marginBottom: "6px",
-                      textAlign: "left",
-                    }}
-                  >
+                  <label style={{  display: "block", fontSize: "20px", fontWeight: "bold",  marginBottom: "6px", textAlign: "left", }}>
                     Phone
                   </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={editForm.phone}
+                  <input type="tel" name="phone" value={editForm.phone}
                     onChange={(e) => {
                       const onlyNums = e.target.value.replace(/\D/g, "");
                       if (onlyNums.length <= 10) {
@@ -499,116 +351,44 @@ export default function Profile() {
                       }
                     }}
                     maxLength={10}
-                    style={{
-                      width: "100%",
-                      borderRadius: "8px",
-                      border: "1px solid #6ee7b7",
-                      padding: "10px",
-                      outline: "none",
-                      fontSize: "16px",
-                    }}
-                  />
+                    style={{ width: "100%", borderRadius: "8px", border: "1px solid #6ee7b7", padding: "10px", outline: "none",fontSize: "16px",}} />
                 </div>
               </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginTop: "24px",
-                }}
-              >
+              <div style={{ display: "flex", justifyContent: "space-between",  alignItems: "center", marginTop: "24px", }} >
                 <span style={{ fontSize: "20px" }}>{message}</span>
-                <button
-                  type="submit"
-                  style={{
-                    borderRadius: "12px",
-                    background: "#059669",
-                    color: "white",
-                    padding: "12px 20px",
-                    fontSize: "16px",
-                    fontWeight: "600",
-                    border: "none",
-                    cursor: "pointer",
-                    boxShadow: "0 4px 8px rgba(16,185,129,0.3)",
-                  }}
-                  onMouseOver={(e) => (e.target.style.background = "#047857")}
-                  onMouseOut={(e) => (e.target.style.background = "#059669")}
-                >
+                <button type="submit"
+                        style={{ borderRadius: "12px", background: "#059669", color: "white", padding: "12px 20px", fontSize: "16px", fontWeight: "600", border: "none", cursor: "pointer", boxShadow: "0 4px 8px rgba(16,185,129,0.3)", }}
+                          onMouseOver={(e) => (e.target.style.background = "#047857")}
+                          onMouseOut={(e) => (e.target.style.background = "#059669")} >
                   Save changes
                 </button>
               </div>
             </form>
 
             {/* Emergency Contact */}
-            <form
-              onSubmit={handleSaveEmergency}
-              style={{
-                borderRadius: "16px",
-                border: "1px solid #6ee7b7",
-                background: "white",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                padding: "30px",
-              }}
-            >
-              <h2
-                style={{
-                  fontSize: "30px",
-                  fontWeight: "700",
-                  color: "#dc2626",
-                  marginBottom: "16px",
-                }}
-              >
+            <form onSubmit={handleSaveEmergency}
+                  style={{ borderRadius: "16px", border: "1px solid #6ee7b7", background: "white", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", padding: "30px", }} >
+              <h2 style={{ fontSize: "30px", fontWeight: "700", color: "#dc2626", marginBottom: "16px", }} >
                 Emergency Contact
               </h2>
               <br />
 
               <div style={{ display: "grid", gap: "20px", paddingRight: "20px" }}>
                 <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "20px",
-                      marginBottom: "6px",
-                      textAlign: "left",
-                      fontWeight: "bold",
-                    }}
-                  >
+                  <label style={{ display: "block", fontSize: "20px", marginBottom: "6px", textAlign: "left", fontWeight: "bold",}} >
                     Name
                   </label>
-                  <input
-                    type="text"
-                    name="emergencyName"
-                    value={emergencyForm.emergencyName}
+                  <input type="text" name="emergencyName" value={emergencyForm.emergencyName}
                     onChange={handleEmergencyChange}
-                    style={{
-                      width: "100%",
-                      borderRadius: "8px",
-                      border: "1px solid #6ee7b7",
-                      padding: "10px",
-                      outline: "none",
-                      fontSize: "16px",
-                    }}
-                  />
+                    style={{ width: "100%", borderRadius: "8px", border: "1px solid #6ee7b7", padding: "10px", outline: "none", fontSize: "16px",}} />
                 </div>
 
                 <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "20px",
-                      marginBottom: "6px",
-                      textAlign: "left",
-                      fontWeight: "bold",
-                    }}
-                  >
+                  <label style={{ display: "block", fontSize: "20px", marginBottom: "6px", textAlign: "left", fontWeight: "bold", }} >
                     Phone
                   </label>
-                  <input
-                    type="tel"
-                    name="emergencyPhone"
-                    value={emergencyForm.emergencyPhone}
+                  <input type="tel" name="emergencyPhone" value={emergencyForm.emergencyPhone}
                     onChange={(e) => {
                       const onlyNums = e.target.value.replace(/\D/g, "");
                       if (onlyNums.length <= 10) {
@@ -616,43 +396,16 @@ export default function Profile() {
                       }
                     }}
                     maxLength={10}
-                    style={{
-                      width: "100%",
-                      borderRadius: "8px",
-                      border: "1px solid #6ee7b7",
-                      padding: "10px",
-                      outline: "none",
-                      fontSize: "16px",
-                    }}
-                  />
+                    style={{ width: "100%", borderRadius: "8px", border: "1px solid #6ee7b7", padding: "10px", outline: "none", fontSize: "16px", }} />
                 </div>
               </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginTop: "24px",
-                }}
-              >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "24px",}} >
                 <span style={{ fontSize: "14px" }}>{emergencyMessage}</span>
-                <button
-                  type="submit"
-                  style={{
-                    borderRadius: "12px",
-                    background: "#dc2626",
-                    color: "white",
-                    padding: "12px 20px",
-                    fontWeight: "600",
-                    fontSize: "16px",
-                    border: "none",
-                    cursor: "pointer",
-                    boxShadow: "0 4px 8px rgba(220,38,38,0.3)",
-                  }}
-                  onMouseOver={(e) => (e.target.style.background = "#b91c1c")}
-                  onMouseOut={(e) => (e.target.style.background = "#dc2626")}
-                >
+                <button type="submit" style={{ borderRadius: "12px", background: "#dc2626", color: "white", padding: "12px 20px",
+                        fontWeight: "600", fontSize: "16px", border: "none", cursor: "pointer", boxShadow: "0 4px 8px rgba(220,38,38,0.3)", }}
+                          onMouseOver={(e) => (e.target.style.background = "#b91c1c")}
+                          onMouseOut={(e) => (e.target.style.background = "#dc2626")} >
                   Save Emergency
                 </button>
               </div>
@@ -663,25 +416,8 @@ export default function Profile() {
       <br />
 
       {/* Booking History */}
-      <section
-        style={{
-          maxWidth: "1150px",
-          margin: "0 auto",
-          borderRadius: "16px",
-          border: "1px solid #6ee7b7",
-          background: "white",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-          padding: "24px",
-        }}
-      >
-        <h2
-          style={{
-            fontSize: "30px",
-            fontWeight: "700",
-            color: "#065f46",
-            marginBottom: "16px",
-          }}
-        >
+      <section style={{ maxWidth: "1150px", margin: "0 auto", borderRadius: "16px", border: "1px solid #6ee7b7",มbackground: "white", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", padding: "24px", }} >
+        <h2 style={{ fontSize: "30px", fontWeight: "700", color: "#065f46", marginBottom: "16px", }} >
           ประวัติการจองสนาม
         </h2>
         <br />
@@ -690,9 +426,7 @@ export default function Profile() {
           <p style={{ fontSize: "14px", color: "#6b7280" }}>คุณยังไม่มีประวัติการจอง</p>
         ) : (
           <div style={{ overflowX: "auto" }}>
-            <table
-              style={{ width: "100%", borderCollapse: "collapse", borderRadius: "12px", overflow: "hidden" }}
-            >
+            <table style={{ width: "100%", borderCollapse: "collapse", borderRadius: "12px", overflow: "hidden" }} >
               <thead>
                 <tr style={{ background: "#065f46" }}>
                   <th style={{ padding: "12px", color: "white", fontWeight: "600", textAlign: "center" }}>

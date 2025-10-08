@@ -21,11 +21,10 @@ const images = [
 export default function Home() {
     
   const [user, setUser] = useState(null);
-  const [current, setCurrent] = useState(0); //56
-  const [selectedImage, setSelectedImage] = useState(null); // popup image
+  const [current, setCurrent] = useState(0);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
-    // ดึงข้อมูล user จาก localStorage
     const savedUser = localStorage.getItem("auth:user");
     if (savedUser) {
     try {
@@ -36,7 +35,6 @@ export default function Home() {
   }
   }, []);
 
-  // Simple slider next/prev
   const nextSlide = () => setCurrent((prev) => (prev + 1) % heroImages.length);
   const prevSlide = () => setCurrent((prev) => (prev - 1 + heroImages.length) % heroImages.length);
 

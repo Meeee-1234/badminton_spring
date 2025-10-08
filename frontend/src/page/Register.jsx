@@ -12,7 +12,7 @@ export default function Register() {
     email: "",
     phone: "",
     password: "",
-    confirmPassword: "" // ✅ เพิ่ม
+    confirmPassword: ""
   });
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
@@ -37,7 +37,7 @@ export default function Register() {
 
     setLoading(true);
     try {
-      const { name, email, phone, password } = form; // ✅ ส่งเฉพาะ field ที่ backend ใช้
+      const { name, email, phone, password } = form; 
       const payload = { name, email, phone, password };
 
       const res = await fetch(`${API}/api/auth/register`, {

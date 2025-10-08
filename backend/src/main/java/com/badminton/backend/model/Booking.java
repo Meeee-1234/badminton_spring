@@ -12,12 +12,13 @@ public class Booking {
     @DBRef
     private User user;
 
-    private String date;   // YYYY-MM-DD
-    private int court;     // เลขคอร์ต
-    private int hour;      // ชั่วโมง (9 = 09:00-10:00)
-    private String status; // booked, arrived, canceled
+    private String date; 
+    private int court;   
+    private int hour; 
+    private String status; 
     private String note;
 
+    
 
     public Booking() {}
 
@@ -30,7 +31,7 @@ public class Booking {
         this.note = note;
     }
 
-    // ✅ Getter & Setter
+
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
 

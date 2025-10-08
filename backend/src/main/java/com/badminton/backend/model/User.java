@@ -2,6 +2,7 @@ package com.badminton.backend.model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 @Document(collection = "users")
 public class User {
@@ -22,8 +23,6 @@ public class User {
         this.phone = phone;
         this.password = password;
     }
-
-    // ---------- GETTERS ----------
     public String getId() {
         return id;
     }
@@ -48,7 +47,6 @@ public class User {
         return role;
     }
 
-    // ---------- SETTERS ----------
     public void setId(String id) {
         this.id = id;
     }
@@ -72,4 +70,5 @@ public class User {
     public void setRole(String role) {
         this.role = role;
     }
+
 }

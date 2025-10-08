@@ -4,7 +4,7 @@ import jakarta.validation.constraints.*;
 
 public class CreateBookingRequest {
   @NotBlank
-  private String date; // YYYY-MM-DD
+  private String date; 
 
   @Min(1) @Max(100)
   private int court;

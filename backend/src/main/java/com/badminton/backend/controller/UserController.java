@@ -20,19 +20,11 @@ public class UserController {
     @Autowired
     private UserRepository userRepo;
 
-
-
-    // ✅ ดึงผู้ใช้ทั้งหมด
     @GetMapping("")
     public ResponseEntity<?> getAllUsers() {
         List<User> users = userRepo.findAll();
         return ResponseEntity.ok(Map.of("users", users));
     }
-
-
-
-
-    
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User user) {
@@ -72,18 +64,17 @@ public class UserController {
 
             User savedUser = userRepo.save(user);
 
-            // ✅ แก้ตรงนี้ ไม่ return user ตรง ๆ
             Map<String, Object> userResponse = new HashMap<>();
             userResponse.put("id", savedUser.getId());
             userResponse.put("name", savedUser.getName());
             userResponse.put("email", savedUser.getEmail());
             userResponse.put("phone", savedUser.getPhone());
-            userResponse.put("role", savedUser.getRole()); // ✅ ไม่ใส่ password
+            userResponse.put("role", savedUser.getRole()); 
 
             return ResponseEntity.ok(Map.of("message", "อัปเดตข้อมูลเรียบร้อยแล้ว", "user", userResponse));
 
         } catch (Exception e) {
-            e.printStackTrace(); // ✅ log error ไว้
+            e.printStackTrace();
             return ResponseEntity.status(500).body(Map.of("error", "Server error", "detail", e.getMessage()));
         }
     }

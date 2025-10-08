@@ -1,4 +1,4 @@
-// src/main/java/com/badminton/backend/config/SecurityConfig.java
+
 package com.badminton.backend.config;
 
 import org.springframework.context.annotation.Bean;
@@ -16,10 +16,9 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(Customizer.withDefaults())
             .authorizeHttpRequests(auth -> auth
-                // เปิดสาธารณะสำหรับทดสอบก่อน
+               
                 .requestMatchers("/api/admin/users/**").permitAll()
 
-                // อื่น ๆ ของคุณ
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/users/**").permitAll()
                 .requestMatchers("/api/profile/**").permitAll()

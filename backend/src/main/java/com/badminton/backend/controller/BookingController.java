@@ -22,7 +22,6 @@ public class BookingController {
     @Autowired
     private UserRepository userRepo;
 
-    // ✅ check สนามกับเวลาไหนที่ถูกจองไปแล้ว
     @GetMapping("/taken")
     public ResponseEntity<?> getTaken(@RequestParam String date) {
         if (!date.matches("\\d{4}-\\d{2}-\\d{2}")) {
@@ -43,14 +42,12 @@ public class BookingController {
         return ResponseEntity.ok(Map.of("taken", taken));
     }
 
-    // ✅ ดึงการจองทั้งหมดของ user
     @GetMapping("/user/{userId}")
     public ResponseEntity<?> getBookingsByUser(@PathVariable String userId) {
         List<Booking> bookings = bookingRepo.findByUserId(userId);
         return ResponseEntity.ok(Map.of("bookings", bookings));
     }
 
-    // ✅ ดูการจองของ user ตามวัน (ไม่เอาที่ถูกยกเลิก)
     @GetMapping("/my/{userId}/{date}")
     public ResponseEntity<?> getMyBookings(@PathVariable String userId, @PathVariable String date) {
         if (!date.matches("\\d{4}-\\d{2}-\\d{2}")) {
@@ -68,58 +65,46 @@ public class BookingController {
         return ResponseEntity.ok(Map.of("mine", mine));
     }
 
-@PostMapping("")
-public ResponseEntity<?> createBooking(@RequestBody Map<String, Object> req) {
-    try {
-        // รับค่าจาก req
-        String userId = (String) req.get("userId");
-        String date = (String) req.get("date");
-        String note = req.getOrDefault("note", "").toString();
+  @PostMapping("")
+  public ResponseEntity<?> createBooking(@RequestBody Map<String, Object> req) {
+      try {
+          String userId = (String) req.get("userId");
+          String date = (String) req.get("date");
+          String note = req.getOrDefault("note", "").toString();
 
-        // ⚠️ court กับ hour เป็น Number ต้อง cast แบบปลอดภัย
-        int court = ((Number) req.get("court")).intValue();
-        int hour = ((Number) req.get("hour")).intValue();
+          int court = ((Number) req.get("court")).intValue();
+          int hour = ((Number) req.get("hour")).intValue();
 
-        if (userId == null || date == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "ข้อมูลไม่ครบ"));
-        }
+          if (userId == null || date == null) {
+              return ResponseEntity.badRequest().body(Map.of("error", "ข้อมูลไม่ครบ"));
+          }
 
-        // หา user จาก id
-        Optional<User> userOpt = userRepo.findById(userId);
-        if (userOpt.isEmpty()) {
-            return ResponseEntity.status(404).body(Map.of("error", "ไม่พบผู้ใช้"));
-        }
+          Optional<User> userOpt = userRepo.findById(userId);
+          if (userOpt.isEmpty()) {
+              return ResponseEntity.status(404).body(Map.of("error", "ไม่พบผู้ใช้"));
+          }
 
-        // เช็กว่าซ้ำไหม
-        List<String> activeStatus = Arrays.asList("booked", "arrived");
-        Optional<Booking> exists = bookingRepo.findByDateAndCourtAndHourAndStatusIn(date, court, hour, activeStatus);
-        if (exists.isPresent()) {
-            return ResponseEntity.status(409).body(Map.of("error", "ช่วงเวลานี้ถูกจองแล้ว"));
-        }
+          List<String> activeStatus = Arrays.asList("booked", "arrived");
+          Optional<Booking> exists = bookingRepo.findByDateAndCourtAndHourAndStatusIn(date, court, hour, activeStatus);
+          if (exists.isPresent()) {
+              return ResponseEntity.status(409).body(Map.of("error", "ช่วงเวลานี้ถูกจองแล้ว"));
+          }
 
-        // สร้าง booking ใหม่
-        Booking booking = new Booking(userOpt.get(), date, court, hour, "booked", note);
-        Booking saved = bookingRepo.save(booking);
+          Booking booking = new Booking(userOpt.get(), date, court, hour, "booked", note);
+          Booking saved = bookingRepo.save(booking);
 
-        return ResponseEntity.status(201).body(Map.of("message", "จองสำเร็จ", "booking", saved));
-    } catch (Exception e) {
-        e.printStackTrace(); // ✅ แสดง error บน console
-        return ResponseEntity.status(500).body(Map.of("error", "Server error", "detail", e.getMessage()));
-    }
-}
+          return ResponseEntity.status(201).body(Map.of("message", "จองสำเร็จ", "booking", saved));
+      } catch (Exception e) {
+          e.printStackTrace();
+          return ResponseEntity.status(500).body(Map.of("error", "Server error", "detail", e.getMessage()));
+      }
+  }
 
-
-
-
-
-
-
-// ✅ ดึงการจองทั้งหมด
-@GetMapping("")
-public ResponseEntity<?> getAllBookings() {
-    List<Booking> bookings = bookingRepo.findAll();
-    return ResponseEntity.ok(Map.of("bookings", bookings));
-}
+  @GetMapping("")
+  public ResponseEntity<?> getAllBookings() {
+      List<Booking> bookings = bookingRepo.findAll();
+      return ResponseEntity.ok(Map.of("bookings", bookings));
+  }
 
 
 }

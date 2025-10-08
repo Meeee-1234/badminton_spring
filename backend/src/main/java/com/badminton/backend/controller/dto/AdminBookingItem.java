@@ -5,8 +5,8 @@ public class AdminBookingItem {
     private String date;
     private int court;
     private int hour;
-    private String status;   // booked | arrived | canceled
-    private String userName; // ชื่อผู้จอง
+    private String status;   
+    private String userName; 
     private String note;
 
     public AdminBookingItem() {}

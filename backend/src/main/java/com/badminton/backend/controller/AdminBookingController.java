@@ -20,7 +20,6 @@ public class AdminBookingController {
     @Autowired
     private BookingRepository bookingRepo;
 
-    // ✅ แปลงสถานะจาก frontend ให้ตรงกับ backend
     private String normalizeStatus(String raw) {
         String v = String.valueOf(raw == null ? "" : raw).trim().toLowerCase();
         if (v.equals("checked_in") || v.equals("arrived")) return "arrived";
@@ -44,7 +43,6 @@ public class AdminBookingController {
         );
     }
 
-    /** ✅ GET /api/admin/bookings */
     @GetMapping("")
     public ResponseEntity<?> listBookings(@RequestParam(required = false) String date) {
         List<Booking> list;
@@ -63,9 +61,6 @@ public class AdminBookingController {
         return ResponseEntity.ok(Map.of("bookings", items));
     }
 
-    
-
-    /** ✅ PUT /api/admin/bookings/{id}/status */
     @PutMapping("/{id}/status")
     public ResponseEntity<?> updateStatus(@PathVariable String id, @RequestBody UpdateStatusRequest req) {
         Optional<Booking> opt = bookingRepo.findById(id);
@@ -83,4 +78,6 @@ public class AdminBookingController {
                 "booking", toAdminItem(saved)
         ));
     }
+
+
 }

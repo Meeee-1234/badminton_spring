@@ -1,7 +1,7 @@
 package com.badminton.backend.controller.dto;
 
 public class UpdateStatusRequest {
-    private String status; // "booked" | "arrived" | "checked_in" | "canceled"
+    private String status;
 
     public UpdateStatusRequest() {}
 

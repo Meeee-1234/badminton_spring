@@ -32,7 +32,6 @@ const ENDPOINTS = {
   create: `${API}/api/bookings`,
 };
 
-// ใช้วันที่แบบ local
 const toDateKey = (d = new Date()) => {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -40,7 +39,6 @@ const toDateKey = (d = new Date()) => {
   return `${y}-${m}-${day}`;
 };
 
-/** ระยะเวลาถึงเที่ยงคืนครั้งถัดไป (Local) */
 const msUntilNextMidnightLocal = () => {
   const now = new Date();
   const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
@@ -51,9 +49,9 @@ export default function Details() {
   const navigate = useNavigate();
 
   const [dateKey, setDateKey] = useState(() => toDateKey());
-  const [taken, setTaken] = useState([]);      // [{key:"c:h", status:"booked|arrived"}]
-  const [mine, setMine]   = useState([]);      // ["c:h", ...]
-  const [selected, setSelected] = useState([]); // [{court, hour}]
+  const [taken, setTaken] = useState([]);     
+  const [mine, setMine]   = useState([]);      
+  const [selected, setSelected] = useState([]);
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
@@ -155,7 +153,6 @@ export default function Details() {
           : Promise.resolve(null),
       ]);
 
-      // taken
       if (tRes?.ok) {
         const tJson = await tRes.json();
         setTaken(Array.isArray(tJson?.taken) ? tJson.taken : []);
@@ -163,7 +160,6 @@ export default function Details() {
         setTaken([]);
       }
 
-      // mine
       if (mRes && mRes.ok) {
         const mJson = await mRes.json();
         setMine(Array.isArray(mJson?.mine) ? mJson.mine : []);
@@ -195,7 +191,7 @@ export default function Details() {
   const formatHourLabel = (h) => `${h.toString().padStart(2, "0")}:00 - ${h + 1}:00`;
   const getStatus = (c, h) => {
     const cell = taken.find(t => t.key === `${c}:${h}`);
-    return cell ? cell.status : null; // "booked" หรือ "arrived" หรือ null
+    return cell ? cell.status : null; 
   };
 
   const isMine  = (c, h) => mine.includes(`${c}:${h}`);
@@ -203,7 +199,7 @@ export default function Details() {
 
   const toggleCell = (c, h) => {
     const status = getStatus(c, h);
-    if (status === "arrived" || status === "booked") return; // ❌ กันไม่ให้เลือกถ้าเต็ม
+    if (status === "arrived" || status === "booked") return; 
     setSelected((prev) =>
       prev.some((s) => s.court === c && s.hour === h)
         ? prev.filter((s) => !(s.court === c && s.hour === h))
@@ -211,61 +207,60 @@ export default function Details() {
     );
   };
 
-const handleConfirm = async () => {
-  setLoading(true);
-  setMsg("");
+  const handleConfirm = async () => {
+    setLoading(true);
+    setMsg("");
 
-  try {
-    const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
+    try {
+      const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
 
-    if (!user?.id) {
-      setMsg("❌ กรุณาเข้าสู่ระบบก่อนจอง");
-      setLoading(false);
-      return;
-    }
-
-    for (const s of selected) {
-      const res = await fetch(ENDPOINTS.create, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          userId: user.id,     // ✅ ต้องมี userId ใน body
-          date: dateKey,
-          court: s.court,
-          hour: s.hour,
-          note
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setMsg(`❌ จองคอร์ต ${s.court} เวลา ${formatHourLabel(s.hour)} ไม่สำเร็จ: ${data.error || "unknown"}`);
+      if (!user?.id) {
+        setMsg("❌ กรุณาเข้าสู่ระบบก่อนจอง");
         setLoading(false);
         return;
       }
+
+      for (const s of selected) {
+        const res = await fetch(ENDPOINTS.create, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            userId: user.id,    
+            date: dateKey,
+            court: s.court,
+            hour: s.hour,
+            note
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          setMsg(`❌ จองคอร์ต ${s.court} เวลา ${formatHourLabel(s.hour)} ไม่สำเร็จ: ${data.error || "unknown"}`);
+          setLoading(false);
+          return;
+        }
+      }
+
+      setMsg("✅ จองสำเร็จ!");
+      const newTakenObjs = selected.map(s => ({ key: `${s.court}:${s.hour}`, status: "booked" }));
+      const newMineKeys = selected.map(s => `${s.court}:${s.hour}`);
+
+      setMine(prev => [...prev, ...newMineKeys]);
+      setTaken(prev => [...prev, ...newTakenObjs]);
+      setSelected([]);
+      setNote("");
+
+      loadTakenMine(); 
+
+    } catch (err) {
+      console.error("Booking error:", err);
+      setMsg("❌ Server error");
+    } finally {
+      setLoading(false);
     }
-
-    setMsg("✅ จองสำเร็จ!");
-    const newTakenObjs = selected.map(s => ({ key: `${s.court}:${s.hour}`, status: "booked" }));
-    const newMineKeys = selected.map(s => `${s.court}:${s.hour}`);
-
-    setMine(prev => [...prev, ...newMineKeys]);
-    setTaken(prev => [...prev, ...newTakenObjs]);
-    setSelected([]);
-    setNote("");
-
-    loadTakenMine(); // รีโหลดหลังจองเสร็จ
-
-  } catch (err) {
-    console.error("Booking error:", err);
-    setMsg("❌ Server error");
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   const goHome = () => {
     try { navigate("/"); } catch { window.location.href = "/"; }
@@ -332,7 +327,7 @@ const handleConfirm = async () => {
                         label = "ของฉัน";
                         styleForCell = ui.cellMine;
                       } else if (status === "arrived" || status === "booked") {
-                        label = "เต็ม"; // มาแล้ว หรือ จองแล้ว → เต็ม
+                        label = "เต็ม"; 
                         styleForCell = ui.cellTaken;
                       } else if (picked) {
                         label = "เลือกแล้ว";

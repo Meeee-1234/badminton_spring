@@ -42,14 +42,11 @@ export default function Login() {
         return;
       }
 
-      // 1) เก็บ token
       if (data.token) localStorage.setItem("auth:token", data.token);
 
-      // 2) เก็บ user: ถ้า login ส่ง user มา → normalize แล้วเก็บ
       if (data.user) {
         saveUserNormalized(data.user);
       } else {
-        // 3) ถ้า login ไม่ส่ง user มา → ยิง /auth/me เพื่อดึงโปรไฟล์แล้วค่อยเก็บ
         const meRes = await fetch(`${API}/api/auth/me`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("auth:token") || ""}` },
         });
