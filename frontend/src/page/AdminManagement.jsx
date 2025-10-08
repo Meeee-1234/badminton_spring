@@ -86,15 +86,26 @@ export default function AdminManagement() {
       } catch (err) {
         console.error("❌ Users error:", err);
         setUsers([]);
-      } finally {
-        setLoading(false);
       }
     }
 
-    fetchUsers();
+    async function fetchBookings() {
+      try {
+        const res = await fetch(`${API}/api/admin/bookings`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        setBookings(normalizeBookings(data));
+      } catch (err) {
+        console.error("❌ Bookings error:", err);
+        setBookings([]);
+      }
+    }
+
+    Promise.all([fetchUsers(), fetchBookings()])
+      .finally(() => setLoading(false));
+
   }, [navigate]);
-
-
 
 
 
