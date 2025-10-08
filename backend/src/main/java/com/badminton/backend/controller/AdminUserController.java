@@ -18,10 +18,8 @@ public class AdminUserController {
 
     @GetMapping("")
     public ResponseEntity<List<User>> listUsers() {
-        List<User> users = userRepo.findAll();
-        return ResponseEntity.ok(users);  // ส่ง array ตรงๆ
+        return ResponseEntity.ok(userRepo.findByRoleIgnoreCase("user")); // ✅ ดึงตรง ๆ จาก DB
     }
-
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteUser(@PathVariable String id) {
