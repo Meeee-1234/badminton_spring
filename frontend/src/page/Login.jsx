@@ -19,6 +19,7 @@ export default function Login() {
       _id: rawUser?._id ?? rawUser?.id ?? rawUser?.userId ?? rawUser?.uuid,
       name: rawUser?.name ?? rawUser?.fullName ?? rawUser?.username ?? "",
       email: rawUser?.email ?? "",
+      phone: rawUser?.phone ?? rawUser?.tel ?? rawUser?.mobile ?? rawUser?.phoneNumber ?? "",
       role: rawUser?.role ?? "user",
       ...rawUser,
     };

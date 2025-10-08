@@ -30,6 +30,24 @@ export default function Profile() {
   const getId = (u) => u?._id ?? u?.id ?? u?.userId ?? u?.uuid ?? null;
   const getToken = () => localStorage.getItem("auth:token") || "";
 
+  const normalizeUser = (raw) => {
+    const _id = raw?._id ?? raw?.id ?? raw?.userId ?? raw?.uuid ?? null;
+    return {
+      _id,
+      id: _id,
+      name: raw?.name ?? raw?.fullName ?? raw?.username ?? "",
+      email: raw?.email ?? "",
+      phone:
+        raw?.phone ??
+        raw?.tel ??
+        raw?.mobile ??
+        raw?.phoneNumber ??
+        "",
+      role: raw?.role ?? "user",
+      ...raw,
+    };
+  };
+
   const authFetch = async (url, init = {}) => {
     const token = getToken();
     const headers = {
@@ -41,11 +59,39 @@ export default function Profile() {
 
   const tryFetchJson = async (url, withAuth = false) => {
     try {
-      const res = withAuth ? await authFetch(url, { cache: "no-store" }) : await fetch(url, { cache: "no-store" });
+      const res = withAuth
+        ? await authFetch(url, { cache: "no-store" })
+        : await fetch(url, { cache: "no-store" });
       if (!res.ok) return null;
       return await res.json();
     } catch {
       return null;
+    }
+  };
+
+  // ✅ ดึงข้อมูลผู้ใช้จาก API เพื่อเติม phone (และฟิลด์อื่น) ให้ครบ
+  const hydrateUser = async (uid) => {
+    if (!uid) return;
+
+    const localU = getLocalUser();
+
+    // ลอง /auth/me ก่อน (มักจะได้ข้อมูลล่าสุด)
+    let me = await tryFetchJson(`${API}/api/auth/me`, true);
+
+    // ถ้าบางระบบ /auth/me ไม่เปิดใช้ ลอง /api/users/:id เป็นอันดับถัดไป
+    if (!me) {
+      me = await tryFetchJson(`${API}/api/users/${uid}`, true);
+    }
+
+    if (me) {
+      // บาง backend อาจห่อเป็น { user: {...} }
+      const payload = me.user || me;
+      const merged = normalizeUser({ ...localU, ...payload });
+
+      // อัปเดต state + localStorage ให้มี phone แน่นอน
+      setUser({ name: merged.name, email: merged.email, phone: merged.phone || "" });
+      setEditForm({ name: merged.name, email: merged.email, phone: merged.phone || "" });
+      localStorage.setItem("auth:user", JSON.stringify(merged));
     }
   };
 
@@ -64,6 +110,9 @@ export default function Profile() {
     setUserId(uid);
     setUser({ name: u.name || "", email: u.email || "", phone: u.phone || "" });
     setEditForm({ name: u.name || "", email: u.email || "", phone: u.phone || "" });
+
+    // ✅ เติมข้อมูล (โดยเฉพาะ phone) ให้ครบจาก API
+    hydrateUser(uid);
 
     // โหลด emergency profile (แนวโน้มต้องการ auth)
     authFetch(`${API}/api/profile/${uid}`)
@@ -241,13 +290,9 @@ export default function Profile() {
       if (res.ok) {
         setMessage("✅ อัปเดตข้อมูลสำเร็จ");
         const updated = data.user || data;
-        const updatedUser = {
-          ...u,
-          name: updated.name,
-          phone: updated.phone,
-        };
-        setUser(updatedUser);
-        localStorage.setItem("auth:user", JSON.stringify(updatedUser));
+        const merged = normalizeUser({ ...u, ...updated });
+        setUser({ name: merged.name, email: merged.email, phone: merged.phone || "" });
+        localStorage.setItem("auth:user", JSON.stringify(merged));
       } else {
         setMessage(`❌ ${data.error || "อัปเดตไม่สำเร็จ"}`);
       }
@@ -689,7 +734,7 @@ export default function Profile() {
           margin: "0 auto",
           borderRadius: "16px",
           border: "1px solid #6ee7b7",
-          background: "white", // ✅ ลบตัวอักษรแปลกหน้า property
+          background: "white",
           boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
           padding: "24px",
           marginTop: "24px",
