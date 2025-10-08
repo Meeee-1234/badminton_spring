@@ -18,15 +18,46 @@ public class AdminUserController {
 
     @GetMapping("")
     public ResponseEntity<List<User>> listUsers() {
-        return ResponseEntity.ok(userRepo.findByRoleIgnoreCase("user")); // ✅ ดึงตรง ๆ จาก DB
+        List<User> users = userRepo.findByRoleIgnoreCase("user")
+                                .stream()
+                                .filter(u -> !u.isDeleted())
+                                .toList();
+        return ResponseEntity.ok(users);
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteUser(@PathVariable String id) {
-        if (!userRepo.existsById(id)) {
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getUserById(@PathVariable String id) {
+        Optional<User> optional = userRepo.findById(id);
+        if (optional.isEmpty()) {
             return ResponseEntity.status(404).body(Map.of("error", "ไม่พบผู้ใช้"));
         }
-        userRepo.deleteById(id);
-        return ResponseEntity.ok(Map.of("message", "ลบผู้ใช้เรียบร้อยแล้ว"));
+        return ResponseEntity.ok(optional.get());
     }
+
+
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> softDeleteUser(@PathVariable String id) {
+        Optional<User> optional = userRepo.findById(id);
+        if (optional.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("error", "ไม่พบผู้ใช้"));
+        }
+
+        User user = optional.get();
+        user.setDeleted(true);  
+        userRepo.save(user);
+
+        return ResponseEntity.ok(Map.of("message", "ลบผู้ใช้ (Soft Delete) เรียบร้อยแล้ว"));
+    }
+
+
+    @GetMapping("/deleted")
+    public ResponseEntity<?> getDeletedUsers() {
+        List<User> deletedUsers = userRepo.findAll()
+                                        .stream()
+                                        .filter(User::isDeleted)
+                                        .toList();
+        return ResponseEntity.ok(deletedUsers);
+    }
+
 }

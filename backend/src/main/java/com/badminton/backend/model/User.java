@@ -14,8 +14,7 @@ public class User {
     private String password;
     private String role = "user";
 
-    // ✅ เพิ่มฟิลด์ Soft Delete
-    private Boolean deleted = false;
+    private boolean deleted = false;  // ✅ ฟิลด์สำหรับ Soft Delete
 
     public User() {}
 
@@ -33,7 +32,9 @@ public class User {
     public String getPhone() { return phone; }
     public String getPassword() { return password; }
     public String getRole() { return role; }
-    public Boolean getDeleted() { return deleted; }
+    public boolean isDeleted() {
+        return deleted;
+    }
 
     public void setId(String id) { this.id = id; }
     public void setName(String name) { this.name = name; }
@@ -41,5 +42,5 @@ public class User {
     public void setPhone(String phone) { this.phone = phone; }
     public void setPassword(String password) { this.password = password; }
     public void setRole(String role) { this.role = role; }
-    public void setDeleted(Boolean deleted) { this.deleted = deleted; }
+    public void setDeleted(boolean deleted) { this.deleted = deleted; }
 }

@@ -26,6 +26,7 @@ public class UserController {
         return ResponseEntity.ok(Map.of("users", users));
     }
 
+
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User user) {
         if (userRepo.existsByEmail(user.getEmail())) {
