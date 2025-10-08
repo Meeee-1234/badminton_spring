@@ -1,24 +1,18 @@
-// src/page/Login.jsx
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 
-const API =
-  process.env.REACT_APP_API_URL || "https://badminton-spring-1.onrender.com";
+const API = process.env.REACT_APP_API_URL || "https://badminton-spring-1.onrender.com";
 
 export default function Login() {
-  const navigate = useNavigate();
-
-  // ---------- State ----------
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const navigate = useNavigate();
 
-  // ---------- Helpers ----------
-  const handleChange = (e) =>
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const saveUserNormalized = (rawUser) => {
     const user = {
@@ -32,66 +26,33 @@ export default function Login() {
     localStorage.setItem("auth:user", JSON.stringify(user));
   };
 
-  const isBlockedUser = (u) => {
-    if (!u) return true;
-    return (
-      u.deleted === true || u.active === false || /banned|disabled/i.test(u.status || "")
-    );
-  };
-
-  // ---------- Submit ----------
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
-    setMessage("");
-    setLoading(true);
-
+    setError(""); setMessage(""); setLoading(true);
     try {
       const res = await fetch(`${API}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-
       const data = await res.json();
 
       if (!res.ok) {
-        if (res.status === 403) {
-          setError(data.error || "บัญชีนี้ถูกลบหรือปิดใช้งาน");
-        } else {
-          setError(data.error || data.message || "เข้าสู่ระบบไม่สำเร็จ");
-        }
+        setError(data.error || data.message || "เข้าสู่ระบบไม่สำเร็จ");
         return;
       }
 
       if (data.token) localStorage.setItem("auth:token", data.token);
 
       if (data.user) {
-        if (isBlockedUser(data.user)) {
-          localStorage.removeItem("auth:token");
-          setError("บัญชีนี้ถูกลบหรือปิดใช้งาน");
-          return;
-        }
         saveUserNormalized(data.user);
       } else {
         const meRes = await fetch(`${API}/api/auth/me`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("auth:token") || ""}`,
-          },
+          headers: { Authorization: `Bearer ${localStorage.getItem("auth:token") || ""}` },
         });
         const me = await meRes.json();
         if (!meRes.ok) {
-          if (meRes.status === 403) {
-            setError(me.error || "บัญชีนี้ถูกลบหรือปิดใช้งาน");
-          } else {
-            setError(me.error || "ดึงโปรไฟล์ไม่สำเร็จ");
-          }
-          localStorage.removeItem("auth:token");
-          return;
-        }
-        if (isBlockedUser(me)) {
-          localStorage.removeItem("auth:token");
-          setError("บัญชีนี้ถูกลบหรือปิดใช้งาน");
+          setError(me.error || "ดึงโปรไฟล์ไม่สำเร็จ");
           return;
         }
         saveUserNormalized(me);
@@ -107,7 +68,6 @@ export default function Login() {
     }
   };
 
-  // ---------- UI ----------
   return (
     <div style={ui.page}>
       <div style={ui.card}>
@@ -116,44 +76,22 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} style={{ marginTop: 20 }}>
           <div style={ui.field}>
-            <label htmlFor="email" style={ui.label}>
-              Email
-            </label>
+            <label htmlFor="email" style={ui.label}>Email</label>
             <div style={ui.inputWrap}>
-              <input
-                id="email"
-                type="email"
-                name="email"
-                style={ui.input}
-                value={form.email}
-                onChange={handleChange}
-                autoComplete="email"
-                required
-              />
+              <input id="email" type="email" name="email" style={ui.input}
+                     value={form.email} onChange={handleChange} autoComplete="email" required />
             </div>
           </div>
 
           <div style={ui.field}>
-            <label htmlFor="password" style={ui.label}>
-              Password
-            </label>
+            <label htmlFor="password" style={ui.label}>Password</label>
             <div style={ui.inputWrap}>
-              <input
-                id="password"
-                type={showPw ? "text" : "password"}
-                name="password"
-                style={ui.input}
-                value={form.password}
-                onChange={handleChange}
-                autoComplete="current-password"
-                required
-              />
-              <button
-                type="button"
-                style={ui.eyeBtn}
-                onClick={() => setShowPw((v) => !v)}
-                aria-label={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
-              >
+              <input id="password" type={showPw ? "text" : "password"} name="password"
+                     style={ui.input} value={form.password} onChange={handleChange}
+                     autoComplete="current-password" required />
+              <button type="button" style={ui.eyeBtn}
+                      onClick={() => setShowPw(v => !v)}
+                      aria-label={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}>
                 {showPw ? <FiEyeOff /> : <FiEye />}
               </button>
             </div>
@@ -168,17 +106,13 @@ export default function Login() {
         {message && <p style={{ ...ui.message, color: "green" }}>{message}</p>}
 
         <p style={ui.helper}>
-          ยังไม่มีบัญชี?{" "}
-          <Link to="/register" style={ui.link}>
-            สมัครสมาชิก
-          </Link>
+          ยังไม่มีบัญชี? <Link to="/register" style={ui.link}>สมัครสมาชิก</Link>
         </p>
       </div>
     </div>
   );
 }
 
-// ---------- Styles ----------
 const colors = {
   primary: "#10B981",
   primaryDark: "#059669",
