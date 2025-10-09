@@ -9,8 +9,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
-import java.util.Optional;   // ✅ สำคัญ: ต้องมี
-import java.util.HashMap;   // ✅ ใช้ตอนสร้าง payload
+import java.util.Optional;  
+import java.util.HashMap;   
 import java.util.UUID;
 
 @RestController
@@ -34,7 +34,6 @@ public class AuthController {
         }
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         if (user.getRole() == null || user.getRole().isBlank()) user.setRole("user");
-        // ถ้าใช้ soft delete ให้ตั้งค่าเริ่มต้น
         if (user.getDeleted() == null) user.setDeleted(false);
 
         userRepo.save(user);
@@ -50,7 +49,6 @@ public ResponseEntity<?> login(@RequestBody Map<String, String> body) {
         return ResponseEntity.badRequest().body(Map.of("error", "อีเมล/รหัสผ่านไม่ครบ"));
     }
 
-    // ✅ ดึงเฉพาะผู้ใช้ที่ยังไม่ถูกลบเท่านั้น
     Optional<User> opt = userRepo.findByEmailIgnoreCaseAndDeletedFalse(email);
     if (opt.isEmpty()) {
         return ResponseEntity.status(403).body(Map.of("error", "บัญชีนี้ถูกลบหรือไม่มีอยู่ในระบบ"));
@@ -58,12 +56,10 @@ public ResponseEntity<?> login(@RequestBody Map<String, String> body) {
 
     User user = opt.get();
 
-    // ✅ ตรวจรหัสผ่าน
     if (!passwordEncoder.matches(password, user.getPassword())) {
         return ResponseEntity.status(401).body(Map.of("error", "รหัสผ่านไม่ถูกต้อง"));
     }
 
-    // ✅ สร้าง token (ตัวอย่าง)
     String token = UUID.randomUUID().toString();
 
     Map<String, Object> userData = new HashMap<>();

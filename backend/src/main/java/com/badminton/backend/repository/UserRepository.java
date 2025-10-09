@@ -8,10 +8,7 @@ import java.util.Optional;
 public interface UserRepository extends MongoRepository<User, String> {
     boolean existsByEmail(String email);
 
-    // 🔹 เพิ่ม IgnoreCase เพื่อให้ค้นหาอีเมลไม่สนตัวพิมพ์เล็กใหญ่
     Optional<User> findByEmailIgnoreCase(String email);
-
-    // 🔹 (เพิ่มอีกตัวถ้าต้องการให้ตรวจ deleted=false ด้วย)
     Optional<User> findByEmailIgnoreCaseAndDeletedFalse(String email);
 
     List<User> findByRoleIgnoreCase(String role);

@@ -1,11 +1,10 @@
 import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
-
 const API = process.env.REACT_APP_API_URL || "https://badminton-spring-1.onrender.com";
 
 const OPEN_HOUR = 9;
-const CLOSE_HOUR = 21; 
+const CLOSE_HOUR = 21;
 const HOURS = Array.from({ length: CLOSE_HOUR - OPEN_HOUR }, (_, i) => OPEN_HOUR + i);
 const COURTS = [1, 2, 3, 4, 5, 6];
 const PRICE_PER_HOUR = 120;
@@ -32,6 +31,7 @@ const ENDPOINTS = {
   create: `${API}/api/bookings`,
 };
 
+// ========= helpers =========
 const toDateKey = (d = new Date()) => {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -45,23 +45,33 @@ const msUntilNextMidnightLocal = () => {
   return next.getTime() - now.getTime();
 };
 
+const getLocalUser = () => {
+  try { return JSON.parse(localStorage.getItem("auth:user") || "{}"); }
+  catch { return {}; }
+};
+const getUserId = (u) => u?._id ?? u?.id ?? u?.userId ?? u?.uuid ?? null;
+const getToken = () => localStorage.getItem("auth:token") || "";
+
+// ======================================
+
 export default function Details() {
   const navigate = useNavigate();
 
   const [dateKey, setDateKey] = useState(() => toDateKey());
-  const [taken, setTaken] = useState([]);     
-  const [mine, setMine]   = useState([]);      
+  const [taken, setTaken] = useState([]);
+  const [mine, setMine]   = useState([]);
   const [selected, setSelected] = useState([]);
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
   const [scale, setScale] = useState(1);
+
   const viewportRef = useRef(null);
   const contentRef = useRef(null);
   const userRef = useRef(null);
 
   useEffect(() => {
-    userRef.current = JSON.parse(localStorage.getItem("auth:user") || "{}");
+    userRef.current = getLocalUser();
   }, []);
 
   useLayoutEffect(() => {
@@ -114,7 +124,7 @@ export default function Details() {
       midnightTimer = setTimeout(() => {
         const today = toDateKey(new Date());
         setDateKey(prev => (prev !== today ? today : prev));
-        scheduleNext(); 
+        scheduleNext();
       }, msUntilNextMidnightLocal());
     };
 
@@ -126,7 +136,7 @@ export default function Details() {
       if (document.visibilityState === "visible") {
         const t = toDateKey(new Date());
         setDateKey(prev => (prev !== t ? t : prev));
-        scheduleNext(); 
+        scheduleNext();
       }
     };
     document.addEventListener("visibilitychange", onVisible);
@@ -144,24 +154,25 @@ export default function Details() {
 
   const loadTakenMine = useCallback(async () => {
     try {
-      const user = userRef.current || JSON.parse(localStorage.getItem("auth:user") || "{}");
+      const user = userRef.current || getLocalUser();
+      const userId = getUserId(user);
 
       const [tRes, mRes] = await Promise.all([
         fetch(ENDPOINTS.taken(dateKey), { cache: "no-store" }),
-        user?.id
-          ? fetch(ENDPOINTS.mine(dateKey, user.id), { cache: "no-store" }).catch(() => null)
+        userId
+          ? fetch(ENDPOINTS.mine(dateKey, userId), { cache: "no-store" }).catch(() => null)
           : Promise.resolve(null),
       ]);
 
       if (tRes?.ok) {
-        const tJson = await tRes.json();
+        const tJson = await tRes.json().catch(() => ({}));
         setTaken(Array.isArray(tJson?.taken) ? tJson.taken : []);
       } else {
         setTaken([]);
       }
 
       if (mRes && mRes.ok) {
-        const mJson = await mRes.json();
+        const mJson = await mRes.json().catch(() => ({}));
         setMine(Array.isArray(mJson?.mine) ? mJson.mine : []);
       } else {
         setMine([]);
@@ -191,7 +202,7 @@ export default function Details() {
   const formatHourLabel = (h) => `${h.toString().padStart(2, "0")}:00 - ${h + 1}:00`;
   const getStatus = (c, h) => {
     const cell = taken.find(t => t.key === `${c}:${h}`);
-    return cell ? cell.status : null; 
+    return cell ? cell.status : null;
   };
 
   const isMine  = (c, h) => mine.includes(`${c}:${h}`);
@@ -199,7 +210,7 @@ export default function Details() {
 
   const toggleCell = (c, h) => {
     const status = getStatus(c, h);
-    if (status === "arrived" || status === "booked") return; 
+    if (status === "arrived" || status === "booked") return;
     setSelected((prev) =>
       prev.some((s) => s.court === c && s.hour === h)
         ? prev.filter((s) => !(s.court === c && s.hour === h))
@@ -212,9 +223,10 @@ export default function Details() {
     setMsg("");
 
     try {
-      const user = JSON.parse(localStorage.getItem("auth:user") || "{}");
+      const user = getLocalUser();
+      const userId = getUserId(user);
 
-      if (!user?.id) {
+      if (!userId) {
         setMsg("❌ กรุณาเข้าสู่ระบบก่อนจอง");
         setLoading(false);
         return;
@@ -224,18 +236,19 @@ export default function Details() {
         const res = await fetch(ENDPOINTS.create, {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
           },
           body: JSON.stringify({
-            userId: user.id,    
+            userId,          // ใช้ id ที่ normalize แล้ว
             date: dateKey,
             court: s.court,
             hour: s.hour,
-            note
-          })
+            note,
+          }),
         });
 
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           setMsg(`❌ จองคอร์ต ${s.court} เวลา ${formatHourLabel(s.hour)} ไม่สำเร็จ: ${data.error || "unknown"}`);
           setLoading(false);
@@ -252,8 +265,7 @@ export default function Details() {
       setSelected([]);
       setNote("");
 
-      loadTakenMine(); 
-
+      loadTakenMine();
     } catch (err) {
       console.error("Booking error:", err);
       setMsg("❌ Server error");
@@ -281,9 +293,15 @@ export default function Details() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <label htmlFor="date" style={ui.labelSm}>วันที่ (อัตโนมัติ)</label>
 
-                  <input id="date" type="date" value={dateKey} disabled readOnly
-                         title="ระบบจะอัปเดตเป็นวันใหม่โดยอัตโนมัติทุกเที่ยงคืน"
-                         style={{ ...ui.dateInput, background: colors.primarySoft, borderColor: colors.primary }}/>
+                  <input
+                    id="date"
+                    type="date"
+                    value={dateKey}
+                    disabled
+                    readOnly
+                    title="ระบบจะอัปเดตเป็นวันใหม่โดยอัตโนมัติทุกเที่ยงคืน"
+                    style={{ ...ui.dateInput, background: colors.primarySoft, borderColor: colors.primary }}
+                  />
                   <span style={ui.badgeNote}>ตาราง “วันนี้” • อัปเดตอัตโนมัติเที่ยงคืน</span>
                 </div>
               </div>
@@ -296,9 +314,12 @@ export default function Details() {
                   <span style={ui.legendItem}><span style={ui.dotTaken} /> เต็ม</span>
                 </div>
 
-                <button type="button" onClick={loadTakenMine}
-                        style={{ padding: "8px 12px", borderRadius: 10, border: `1px solid ${colors.primaryDark}`, background: colors.primarySoft, color: colors.primaryDark, fontWeight: 800, cursor: "pointer", }}
-                        title="ดึงสถานะล่าสุดอีกครั้ง (เช่น มีคนยกเลิกจากฝั่งแอดมิน)" >
+                <button
+                  type="button"
+                  onClick={loadTakenMine}
+                  style={{ padding: "8px 12px", borderRadius: 10, border: `1px solid ${colors.primaryDark}`, background: colors.primarySoft, color: colors.primaryDark, fontWeight: 800, cursor: "pointer" }}
+                  title="ดึงสถานะล่าสุดอีกครั้ง (เช่น มีคนยกเลิกจากฝั่งแอดมิน)"
+                >
                   รีเฟรชตอนนี้
                 </button>
               </div>
@@ -317,7 +338,7 @@ export default function Details() {
                   <div key={h} role="row" style={{ ...ui.row, ...(idx % 2 === 1 ? ui.rowAlt : null) }}>
                     <div role="cell" style={{ ...ui.timeCell }}>{formatHourLabel(h)}</div>
                     {COURTS.map((c) => {
-                      const status   = getStatus(c, h);   
+                      const status   = getStatus(c, h);
                       const mineCell = isMine(c, h);
                       const picked   = isSelected(c, h);
 
@@ -327,7 +348,7 @@ export default function Details() {
                         label = "ของฉัน";
                         styleForCell = ui.cellMine;
                       } else if (status === "arrived" || status === "booked") {
-                        label = "เต็ม"; 
+                        label = "เต็ม";
                         styleForCell = ui.cellTaken;
                       } else if (picked) {
                         label = "เลือกแล้ว";
@@ -343,11 +364,13 @@ export default function Details() {
                         : { disabled: status === "arrived" || status === "booked", style: commonBtnStyle };
 
                       return (
-                        <button key={`${c}:${h}`}
-                            onClick={() => toggleCell(c, h)}
-                            aria-pressed={picked}
-                            aria-label={`คอร์ต ${c} เวลา ${formatHourLabel(h)}: ${label}`}
-                            {...btnProps} >
+                        <button
+                          key={`${c}:${h}`}
+                          onClick={() => toggleCell(c, h)}
+                          aria-pressed={picked}
+                          aria-label={`คอร์ต ${c} เวลา ${formatHourLabel(h)}: ${label}`}
+                          {...btnProps}
+                        >
                           <span style={ui.statusPill(status, picked, mineCell)}>{label}</span>
                         </button>
                       );
@@ -373,14 +396,21 @@ export default function Details() {
 
               <div style={{ marginTop: 12 }}>
                 <label htmlFor="note" style={ui.labelSm}>หมายเหตุ (ถ้ามี)</label>
-                <textarea id="note" value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                          placeholder="เช่น ต้องการคอร์ตติดผนัง / เปิดไฟเพิ่ม"
-                          style={ui.textarea} rows={3} />
+                <textarea
+                  id="note"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="เช่น ต้องการคอร์ตติดผนัง / เปิดไฟเพิ่ม"
+                  style={ui.textarea}
+                  rows={3}
+                />
               </div>
 
-              <button onClick={handleConfirm} disabled={loading || !selected.length}
-                      style={{ ...ui.confirmBtn, opacity: loading ? 0.75 : 1 }} >
+              <button
+                onClick={handleConfirm}
+                disabled={loading || !selected.length}
+                style={{ ...ui.confirmBtn, opacity: loading ? 0.75 : 1 }}
+              >
                 {loading ? "กำลังยืนยัน..." : "ยืนยันการจอง"}
               </button>
 
@@ -454,10 +484,10 @@ const ui = {
   backBtn: {
     padding: "8px 12px",
     borderRadius: 10,
-    border: "1px solid #6ee7b7", 
-    background: "#ecfdf5", 
+    border: "1px solid #6ee7b7",
+    background: "#ecfdf5",
     cursor: "pointer",
-    fontWeight: 700,  
+    fontWeight: 700,
   },
   labelSm: { display: "block", fontSize: 13, fontWeight: 700, marginBottom: 6, color: colors.muted },
   badgeNote: {
@@ -569,7 +599,7 @@ const ui = {
     fontWeight: 700,
     cursor: "not-allowed",
   },
-  
+
   mineNoDim: {
     pointerEvents: "none",
     cursor: "not-allowed",

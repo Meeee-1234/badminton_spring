@@ -15,28 +15,36 @@ export default function Login() {
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const saveUserNormalized = (rawUser) => {
+    const _id = rawUser?._id ?? rawUser?.id ?? rawUser?.userId ?? rawUser?.uuid ?? null;
+    if (!_id) throw new Error("ไม่พบรหัสผู้ใช้ (_id/id)");
+
     const user = {
-      _id: rawUser?._id ?? rawUser?.id ?? rawUser?.userId ?? rawUser?.uuid,
+      _id,
+      id: _id,
+      userId: _id,
+
       name: rawUser?.name ?? rawUser?.fullName ?? rawUser?.username ?? "",
       email: rawUser?.email ?? "",
       phone: rawUser?.phone ?? rawUser?.tel ?? rawUser?.mobile ?? rawUser?.phoneNumber ?? "",
       role: rawUser?.role ?? "user",
       ...rawUser,
     };
-    if (!user._id) throw new Error("ไม่พบรหัสผู้ใช้ (_id/id)");
+
     localStorage.setItem("auth:user", JSON.stringify(user));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(""); setMessage(""); setLoading(true);
+    setError("");
+    setMessage("");
+    setLoading(true);
     try {
       const res = await fetch(`${API}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         setError(data.error || data.message || "เข้าสู่ระบบไม่สำเร็จ");
@@ -51,7 +59,7 @@ export default function Login() {
         const meRes = await fetch(`${API}/api/auth/me`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("auth:token") || ""}` },
         });
-        const me = await meRes.json();
+        const me = await meRes.json().catch(() => ({}));
         if (!meRes.ok) {
           setError(me.error || "ดึงโปรไฟล์ไม่สำเร็จ");
           return;
@@ -79,20 +87,38 @@ export default function Login() {
           <div style={ui.field}>
             <label htmlFor="email" style={ui.label}>Email</label>
             <div style={ui.inputWrap}>
-              <input id="email" type="email" name="email" style={ui.input}
-                     value={form.email} onChange={handleChange} autoComplete="email" required />
+              <input
+                id="email"
+                type="email"
+                name="email"
+                style={ui.input}
+                value={form.email}
+                onChange={handleChange}
+                autoComplete="email"
+                required
+              />
             </div>
           </div>
 
           <div style={ui.field}>
             <label htmlFor="password" style={ui.label}>Password</label>
             <div style={ui.inputWrap}>
-              <input id="password" type={showPw ? "text" : "password"} name="password"
-                     style={ui.input} value={form.password} onChange={handleChange}
-                     autoComplete="current-password" required />
-              <button type="button" style={ui.eyeBtn}
-                      onClick={() => setShowPw(v => !v)}
-                      aria-label={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}>
+              <input
+                id="password"
+                type={showPw ? "text" : "password"}
+                name="password"
+                style={ui.input}
+                value={form.password}
+                onChange={handleChange}
+                autoComplete="current-password"
+                required
+              />
+              <button
+                type="button"
+                style={ui.eyeBtn}
+                onClick={() => setShowPw(v => !v)}
+                aria-label={showPw ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+              >
                 {showPw ? <FiEyeOff /> : <FiEye />}
               </button>
             </div>

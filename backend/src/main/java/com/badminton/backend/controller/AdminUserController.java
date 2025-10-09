@@ -44,7 +44,7 @@ public class AdminUserController {
             }
 
             User user = opt.get();
-            user.setDeleted(true); // ✅ mark ลบ
+            user.setDeleted(true);
             userRepo.save(user);
 
             return ResponseEntity.ok(Map.of("message", "ปิดการใช้งานผู้ใช้เรียบร้อย"));
